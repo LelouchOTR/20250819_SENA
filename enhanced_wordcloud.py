@@ -205,28 +205,38 @@ def create_visualization(
         )
         ax.add_patch(circle)
         
-        # Add node label above the circle with a clean, modern look
-        label_y_offset = circle_radius + 15  # Position above the circle
-        ax.text(x, y + label_y_offset, 
-               f"LF {node}",  # Using LF prefix for Latent Factor
-               ha='center', 
-               va='bottom',
-               fontsize=10,
-               fontweight='bold',
-               color=colors[i % len(colors)],  # Match node color
-               bbox=dict(
-                   facecolor='white',
-                   alpha=0.9,
-                   edgecolor='none',
-                   boxstyle='round,pad=0.3',
-                   linewidth=0
-               ),
-               zorder=5)  # Above everything else
+        # Store node position and size for later label placement
+        node_info = {
+            'x': x,
+            'y': y,
+            'radius': circle_radius,
+            'color': colors[i % len(colors)],
+            'label': str(node).replace('LF_', '')  # Remove 'LF_' prefix if present
+        }
+        node_positions[node] = (x, y, node_info)
     
     # Add word clouds with higher zorder to be on top of circles
-    for i, (node, (x, y)) in enumerate(node_positions.items()):
+    for i, (node, (x, y, node_info)) in enumerate(node_positions.items()):
         if node in wordclouds:
             wc, wc_size = wordclouds[node]
+            
+            # Add label at the top edge of the word cloud
+            label_y = y + (wc_size // 2) + 15  # Position above the word cloud
+            ax.text(x, label_y, 
+                   node_info['label'],  # Use the cleaned label
+                   ha='center', 
+                   va='bottom',
+                   fontsize=10,
+                   fontweight='bold',
+                   color=node_info['color'],
+                   bbox=dict(
+                       facecolor='white',
+                       alpha=0.9,
+                       edgecolor='none',
+                       boxstyle='round,pad=0.3',
+                       linewidth=0
+                   ),
+                   zorder=5)  # Above everything else
             img = wc.to_array()
             
             # Calculate zoom factor with better scaling for the available space
