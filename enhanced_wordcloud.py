@@ -132,10 +132,15 @@ def create_visualization(
     print("Circle sizes (diameter):", [f"{s:.1f}" for s in all_bp_sizes])
     print()
     
-    # Distribute nodes in a circle
+    # Distribute nodes in a circle with dynamic radius based on number of nodes
     n_nodes = len(data)
-    radius = size * 0.4
+    # Adjust base radius based on number of nodes to reduce center space
+    base_radius = 0.3 if n_nodes <= 5 else 0.35 if n_nodes <= 7 else 0.4
+    radius = size * base_radius
     center = (size/2, size/2)
+    
+    # Adjust word cloud zoom to better fill the space
+    base_zoom = 0.5  # Increased base zoom
     
     for i, (node, node_data) in enumerate(data.items()):
         # Get terms and BP count for this node
@@ -148,13 +153,15 @@ def create_visualization(
         y = center[1] + radius * np.sin(angle)
         node_positions[node] = (x, y)
         
-        # Calculate word cloud size based on BP count
-        # Scale between 200 and 500 pixels based on BP count (11-29)
-        min_wc_size, max_wc_size = 200, 500
+        # Calculate word cloud size based on BP count with less drastic scaling
+        # Scale between 300 and 450 pixels (narrower range) based on BP count
+        min_wc_size, max_wc_size = 300, 450
         if max_bp > min_bp:  # Avoid division by zero
-            wc_size = int(min_wc_size + (bp_count - min_bp) * (max_wc_size - min_wc_size) / (max_bp - min_bp))
+            # Use square root to make scaling less drastic
+            normalized = (bp_count - min_bp) / (max_bp - min_bp)
+            wc_size = int(min_wc_size + np.sqrt(normalized) * (max_wc_size - min_wc_size))
         else:
-            wc_size = 350  # Default size if all BP counts are the same
+            wc_size = 375  # Default size if all BP counts are the same
             
         # Generate word cloud with scaled size
         text = ' '.join(terms[:20])  # Limit number of terms
@@ -207,14 +214,14 @@ def create_visualization(
             wc, wc_size = wordclouds[node]
             img = wc.to_array()
             
-            # Calculate zoom factor based on the word cloud size
-            # Base zoom is 0.4 for size 400, scale proportionally
-            base_size = 400
-            base_zoom = 0.4
-            zoom = base_zoom * (wc_size / base_size)
+            # Calculate zoom factor with better scaling for the available space
+            # Base zoom is higher to fill more space
+            base_zoom = 0.5  # Increased base zoom for better visibility
+            # Scale zoom based on word cloud size but with less variation
+            zoom = base_zoom * (0.8 + 0.4 * (wc_size - 300) / 150)  # Scale between 0.8x and 1.2x of base zoom
             
             # Ensure zoom stays within reasonable bounds
-            zoom = max(0.2, min(0.6, zoom))
+            zoom = max(0.4, min(0.7, zoom))
             
             imagebox = OffsetImage(img, zoom=zoom, resample=True)
             ab = AnnotationBbox(
