@@ -203,21 +203,21 @@ def create_visualization(
         )
         ax.add_patch(circle)
         
-        # Add latent factor number in the center of the circle
-        ax.text(x, y, node,  # Use node name (latent factor number)
-                ha='center', va='center',
-                fontsize=max(10, int(circle_radius/3)),  # Scale font size with circle
+        # Add latent factor number in the center of the circle with a clean white background
+        ax.text(x, y, f"{node}",
+                ha='center', 
+                va='center',
+                fontsize=max(12, int(circle_radius/2.5)),  # Slightly larger font
                 fontweight='bold',
                 color='black',
+                bbox=dict(
+                    facecolor='white',
+                    alpha=0.8,
+                    edgecolor=colors[i % len(colors)],
+                    boxstyle='circle,pad=0.3',
+                    linewidth=1.5
+                ),
                 zorder=3)  # Above the circle, below the word cloud
-        
-        # Add node label
-        ax.text(x, y - circle_radius - 20,  # Position above the circle
-               f"Factor {node}", 
-               ha='center', va='bottom',
-               fontsize=10, fontweight='bold',
-               bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'),
-               zorder=4)  # Above everything
     
     # Add word clouds with higher zorder to be on top of circles
     for i, (node, (x, y)) in enumerate(node_positions.items()):
