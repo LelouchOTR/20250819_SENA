@@ -146,17 +146,27 @@ def create_visualization(
         y = center[1] + radius * np.sin(angle)
         node_positions[node] = (x, y)
         
-        # Generate word cloud
+        # Calculate word cloud size based on BP count
+        # Scale between 200 and 500 pixels based on BP count (11-29)
+        min_wc_size, max_wc_size = 200, 500
+        if max_bp > min_bp:  # Avoid division by zero
+            wc_size = int(min_wc_size + (bp_count - min_bp) * (max_wc_size - min_wc_size) / (max_bp - min_bp))
+        else:
+            wc_size = 350  # Default size if all BP counts are the same
+            
+        # Generate word cloud with scaled size
         text = ' '.join(terms[:20])  # Limit number of terms
         color = plt.cm.get_cmap('tab20')(i % 20)
         wc = generate_circular_wordcloud(
             text,
-            size=400,  # Smaller size for individual word clouds
+            size=wc_size,  # Dynamic size based on BP count
             color_func=get_single_color_func(mcolors.to_hex(color)),
             background_color='white',
-            max_words=50
+            max_words=50,
+            min_font_size=8,  # Adjust based on size
+            max_font_size=100  # Adjust based on size
         )
-        wordclouds[node] = wc
+        wordclouds[node] = (wc, wc_size)  # Store both wordcloud and its size
         
         # Add node circle with size based on BP count (drawn first, behind everything)
         circle_diameter = all_bp_sizes[i]
@@ -192,8 +202,19 @@ def create_visualization(
     # Add word clouds with higher zorder to be on top of circles
     for i, (node, (x, y)) in enumerate(node_positions.items()):
         if node in wordclouds:
-            img = wordclouds[node].to_array()
-            imagebox = OffsetImage(img, zoom=0.4, resample=True)
+            wc, wc_size = wordclouds[node]
+            img = wc.to_array()
+            
+            # Calculate zoom factor based on the word cloud size
+            # Base zoom is 0.4 for size 400, scale proportionally
+            base_size = 400
+            base_zoom = 0.4
+            zoom = base_zoom * (wc_size / base_size)
+            
+            # Ensure zoom stays within reasonable bounds
+            zoom = max(0.2, min(0.6, zoom))
+            
+            imagebox = OffsetImage(img, zoom=zoom, resample=True)
             ab = AnnotationBbox(
                 imagebox, 
                 (x, y),
