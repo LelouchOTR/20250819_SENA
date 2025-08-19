@@ -92,6 +92,118 @@ def build_filtered_graph(adjacency_matrix: np.ndarray, go_ids: list, top_k: int 
         
     return G
 
+def calculate_node_sizes(bp_counts: dict, graph_nodes: list) -> dict:
+    """
+    Calculate node sizes based on BP counts with proper normalization.
+    
+    Args:
+        bp_counts (dict): Dictionary mapping nodes to BP counts.
+        graph_nodes (list): List of nodes in the graph.
+        
+    Returns:
+        dict: Dictionary mapping nodes to their calculated sizes.
+    """
+    counts = [bp_counts.get(node, 0) for node in graph_nodes]
+    max_count = max(counts) if counts else 1
+    min_count = min(counts) if counts else 0
+    
+    node_sizes = {}
+    for node in graph_nodes:
+        bp_count = bp_counts.get(node, 0)
+        if max_count == min_count:
+            node_size = 0.25
+        else:
+            node_size = 0.15 + (bp_count - min_count) / (max_count - min_count) * 0.20
+        node_sizes[node] = node_size
+    
+    return node_sizes
+
+def position_nodes_circular(graph: nx.DiGraph, bp_counts: dict) -> dict:
+    """
+    Position nodes in a circular layout with adjustments for better spacing and presentation.
+    Places nodes with higher BP counts more prominently.
+    
+    Args:
+        graph (nx.DiGraph): The graph to position.
+        bp_counts (dict): Dictionary mapping nodes to BP counts.
+        
+    Returns:
+        dict: Dictionary mapping nodes to their (x, y) positions.
+    """
+    nodes = list(graph.nodes())
+    n_nodes = len(nodes)
+    
+    # Calculate node sizes
+    node_sizes = calculate_node_sizes(bp_counts, nodes)
+    
+    # Sort nodes by BP count (descending) to place important nodes first
+    nodes_sorted = sorted(nodes, key=lambda x: bp_counts.get(x, 0), reverse=True)
+    
+    # Create initial circular layout
+    pos = {}
+    
+    # Place the node with highest BP count at the center
+    if n_nodes > 0:
+        pos[nodes_sorted[0]] = (0, 0)
+        
+        # Place remaining nodes in a circle around the center
+        if n_nodes > 1:
+            # Calculate radius based on node sizes
+            radius = 1.0
+            
+            # Position remaining nodes in a circle
+            for i, node in enumerate(nodes_sorted[1:]):
+                angle = 2 * np.pi * i / (n_nodes - 1)
+                x = radius * np.cos(angle)
+                y = radius * np.sin(angle)
+                pos[node] = (x, y)
+    
+    # Apply force-directed adjustment for better spacing
+    pos = adjust_positions_for_spacing(pos, node_sizes)
+    
+    return pos
+
+def adjust_positions_for_spacing(pos: dict, node_sizes: dict, iterations: int = 50) -> dict:
+    """
+    Adjust node positions to prevent overlapping and ensure proper spacing.
+    
+    Args:
+        pos (dict): Initial node positions.
+        node_sizes (dict): Node sizes for spacing calculation.
+        iterations (int): Number of adjustment iterations.
+        
+    Returns:
+        dict: Adjusted node positions.
+    """
+    if len(pos) <= 1:
+        return pos
+    
+    pos_array = np.array(list(pos.values()))
+    nodes = list(pos.keys())
+    
+    # Force-directed adjustment
+    for _ in range(iterations):
+        disp = np.zeros_like(pos_array)
+        
+        # Repulsive forces between all nodes
+        for i in range(len(pos_array)):
+            for j in range(len(pos_array)):
+                if i != j:
+                    delta = pos_array[i] - pos_array[j]
+                    distance = np.linalg.norm(delta)
+                    if distance > 0:
+                        # Repulsive force
+                        repulsion = (node_sizes[nodes[i]] + node_sizes[nodes[j]]) / distance**2
+                        disp[i] += delta / distance * repulsion
+        
+        # Apply displacements
+        pos_array += disp * 0.01
+    
+    # Update positions dictionary
+    adjusted_pos = {node: tuple(pos_array[i]) for i, node in enumerate(nodes)}
+    
+    return adjusted_pos
+
 def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, bp_counts: dict, output_dir: str = "wordclouds") -> None:
     """
     Generate circular word cloud images for each node in the graph.
@@ -105,22 +217,13 @@ def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, bp_counts: dict, o
     """
     os.makedirs(output_dir, exist_ok=True)
     
-    # Normalize BP counts for sizing
-    counts = [bp_counts.get(node, 0) for node in graph.nodes()]
-    max_count = max(counts) if counts else 1
-    min_count = min(counts) if counts else 0
+    # Calculate node sizes
+    node_sizes = calculate_node_sizes(bp_counts, list(graph.nodes()))
     
     for node in graph.nodes():
         # Get BP names for this node
         bp_names = bp_mappings.get(node, [])
-        bp_count = bp_counts.get(node, 0)
-        
-        # Calculate relative size based on BP count
-        # Normalize between 0.15 and 0.35
-        if max_count == min_count:
-            node_size = 0.25
-        else:
-            node_size = 0.15 + (bp_count - min_count) / (max_count - min_count) * 0.20
+        node_size = node_sizes[node]
         
         # Skip if no BP names
         if not bp_names:
@@ -173,8 +276,8 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, bp_counts: dict, w
         wordcloud_dir (str): Directory containing word cloud images.
         output_path (str): Path to save the final composite image.
     """
-    # Calculate node positions using spring layout
-    pos = nx.spring_layout(graph, seed=42, k=3, iterations=50)
+    # Calculate node positions using improved circular layout
+    pos = position_nodes_circular(graph, bp_counts)
     
     # Create figure
     fig, ax = plt.subplots(figsize=(14, 12))
@@ -187,10 +290,8 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, bp_counts: dict, w
     ax.set_xlim(min(x_coords) - x_margin, max(x_coords) + x_margin)
     ax.set_ylim(min(y_coords) - y_margin, max(y_coords) + y_margin)
     
-    # Normalize BP counts for sizing
-    counts = [bp_counts.get(node, 0) for node in graph.nodes()]
-    max_count = max(counts) if counts else 1
-    min_count = min(counts) if counts else 0
+    # Calculate node sizes
+    node_sizes = calculate_node_sizes(bp_counts, list(graph.nodes()))
     
     # Draw edges with improved styling - now ending at circle edges
     edge_weights = [abs(graph[u][v]['weight']) for u, v in graph.edges()]
@@ -202,14 +303,9 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, bp_counts: dict, w
         dst_pos = pos[dst]
         weight = abs(data['weight'])
         
-        # Calculate node sizes for this edge
-        if max_count == min_count:
-            src_size = dst_size = 0.25
-        else:
-            src_count = bp_counts.get(src, 0)
-            dst_count = bp_counts.get(dst, 0)
-            src_size = 0.15 + (src_count - min_count) / (max_count - min_count) * 0.20
-            dst_size = 0.15 + (dst_count - min_count) / (max_count - min_count) * 0.20
+        # Get node sizes for this edge
+        src_size = node_sizes[src]
+        dst_size = node_sizes[dst]
         
         # Calculate direction vector
         dx = dst_pos[0] - src_pos[0]
@@ -251,12 +347,8 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, bp_counts: dict, w
         node_pos = pos[node]
         img_path = os.path.join(wordcloud_dir, f"wordcloud_node_{node}.png")
         
-        # Calculate node size based on BP count
-        bp_count = bp_counts.get(node, 0)
-        if max_count == min_count:
-            node_size = 0.25
-        else:
-            node_size = 0.15 + (bp_count - min_count) / (max_count - min_count) * 0.20
+        # Get node size
+        node_size = node_sizes[node]
         
         # Draw circle around node with size proportional to BP count
         circle = Circle(node_pos, node_size, fill=False, color='red', linewidth=2)
