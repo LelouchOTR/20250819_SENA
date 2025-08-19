@@ -16,12 +16,18 @@ def extract_graph_data(model_name="example"):
     np.save('A.npy', causal_graph)
     print(f"Saved causal graph adjacency matrix to A.npy with shape {causal_graph.shape}")
 
-    # Load GO term to gene mappings
-    go_gene_df = pd.read_csv('data/go_kegg_gene_map.tsv', sep='\t')
+    # Load GO term to biological process mappings
+    # This file should contain the actual biological process terms for each GO term
+    go_bp_df = pd.read_csv('data/go_biological_processes.csv')  # You'll need to create this file
     
-    # Load gene name mappings
-    gene_name_df = pd.read_csv('data/ensembl_genename_mapping.tsv', sep='\t')
-    ensembl_to_gene_name = dict(zip(gene_name_df['ensembl_gene_id'], gene_name_df['external_gene_name']))
+    # If the above file doesn't exist, we can try to extract BP names from the GO term descriptions
+    # For now, let's assume we have a mapping of GO terms to their biological process names
+    try:
+        go_bp_mapping = go_bp_df.groupby('go_id')['biological_process'].apply(list).to_dict()
+    except:
+        # Fallback: create a simple mapping with GO term IDs as process names
+        all_gos = go_bp_df['PathwayID'].unique() if 'PathwayID' in go_bp_df.columns else []
+        go_bp_mapping = {go: [f"biological process {go}"] for go in all_gos}
 
     # Get GO terms from the model data (these are the latent factors)
     gos = data['fc1'].columns.tolist()  # GO terms from fc1 layer
@@ -36,35 +42,26 @@ def extract_graph_data(model_name="example"):
     
     # Create BP mappings for top GO terms only
     bp_mappings = []
+    bp_full_lists = {}  # To store all BP terms for each latent factor
     bp_counts = []  # To store the number of BPs for each latent factor
     
     for i, go_term in enumerate(top_gos):
-        # Get genes associated with this GO term
-        genes_in_go = go_gene_df[go_gene_df['PathwayID'] == go_term]['Symbol'].tolist()
+        # Get biological processes associated with this GO term
+        bp_names = go_bp_mapping.get(go_term, [go_term])
+        bp_full_lists[i] = bp_names
         
-        # Convert Ensembl IDs to gene names
-        gene_names = [ensembl_to_gene_name.get(gene_id, gene_id) for gene_id in genes_in_go]
+        # Store the count of associated biological processes
+        bp_counts.append(len(bp_names))
         
-        # Store the count of associated genes (BPs)
-        bp_counts.append(len(gene_names))
-        
-        # Create a descriptive name for the GO term based on associated genes
-        if gene_names:
-            # Take first few gene names to create a label
-            displayed_genes = gene_names[:5]  # Limit to first 5 genes
-            bp_description = f"{go_term} ({', '.join(displayed_genes)})"
-            if len(gene_names) > 5:
-                bp_description += f" +{len(gene_names)-5} more"
-        else:
-            bp_description = go_term
-            
-        bp_mappings.append({
-            'latent_factor': i,
-            'go_id': go_term,
-            'bp_name': bp_description
-        })
+        # For the CSV, we'll store each BP term as a separate row
+        for bp_name in bp_names:
+            bp_mappings.append({
+                'latent_factor': i,
+                'go_id': go_term,
+                'bp_name': bp_name
+            })
 
-    # Save BP mappings
+    # Save BP mappings - one row per biological process term
     bp_df = pd.DataFrame(bp_mappings)
     bp_df.to_csv('bp_mappings.csv', index=False)
     print("Saved BP mappings to bp_mappings.csv")
@@ -77,12 +74,16 @@ def extract_graph_data(model_name="example"):
     bp_counts_df.to_csv('bp_counts.csv', index=False)
     print("Saved BP counts to bp_counts.csv")
 
-    # Also save the full GO to gene mapping for reference
-    print("\nTop GO term mappings:")
+    # Print summary of top GO terms and their biological processes
+    print("\nTop GO term biological processes:")
     for i, go_term in enumerate(top_gos):
-        genes = go_gene_df[go_gene_df['PathwayID'] == go_term]['Symbol'].tolist()
-        gene_names = [ensembl_to_gene_name.get(gene_id, gene_id) for gene_id in genes]
-        print(f"Latent factor {i} ({go_term}): {gene_names[:3]}")
+        bp_list = go_bp_mapping.get(go_term, [go_term])
+        print(f"Latent factor {i} ({go_term}): {len(bp_list)} biological processes")
+        # Show first few processes
+        for bp in bp_list[:10]:
+            print(f"  - {bp}")
+        if len(bp_list) > 10:
+            print(f"  ... and {len(bp_list)-10} more")
 
 if __name__ == "__main__":
     extract_graph_data()
