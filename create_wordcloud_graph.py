@@ -80,7 +80,7 @@ def build_filtered_graph(adjacency_matrix: np.ndarray, go_ids: list, top_k: int 
 
 def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, output_dir: str = "wordclouds") -> None:
     """
-    Generate word cloud images for each node in the graph.
+    Generate circular word cloud images for each node in the graph.
     
     Args:
         graph (nx.DiGraph): The graph containing nodes.
@@ -105,10 +105,10 @@ def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, output_dir: str = 
             plt.close()
             continue
             
-        # Create text from BP names (use GO ID for more prominent display)
+        # Create text from BP names (join all names into one string)
         text = ' '.join(bp_names)
         
-        # Generate word cloud
+        # Generate circular word cloud
         wordcloud = WordCloud(
             width=400,
             height=400,
@@ -117,7 +117,8 @@ def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, output_dir: str = 
             prefer_horizontal=1.0,
             random_state=42,
             relative_scaling=0.5,
-            max_font_size=80
+            max_font_size=80,
+            mask=None  # Will create circular shape by default
         ).generate(text)
         
         # Save word cloud image
@@ -131,7 +132,7 @@ def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, output_dir: str = 
 def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str = "wordclouds", 
                        output_path: str = "causal_graph_wordcloud.png") -> None:
     """
-    Assemble the final plot with word clouds as nodes.
+    Assemble the final plot with circular word clouds as nodes and latent factor labels.
     
     Args:
         graph (nx.DiGraph): The filtered graph with edge weights.
@@ -188,8 +189,7 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
             extent = [x-0.15, x+0.15, y-0.15, y+0.15]  # Adjust size as needed
             ax.imshow(img, extent=extent, aspect='auto', zorder=2)
             
-            # Add node label (GO ID)
-            go_id = go_mappings.get(node, str(node))
+            # Add node label (latent factor number)
             ax.text(x, y, str(node), 
                     ha='center', va='center', 
                     fontsize=14, 
@@ -203,7 +203,7 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
     plt.close()
 
 def main():
-    """Main function to generate causal graph visualization with word clouds."""
+    """Main function to generate causal graph visualization with circular word clouds."""
     # Step 1: Load model outputs
     adjacency_matrix = load_causal_graph("A.npy")
     bp_mappings, go_mappings = load_bp_mappings("bp_mappings.csv")
@@ -214,7 +214,7 @@ def main():
     # Step 2: Build and filter graph
     graph = build_filtered_graph(adjacency_matrix, go_ids, top_k=15)
     
-    # Step 3: Generate word clouds for nodes
+    # Step 3: Generate circular word clouds for nodes
     generate_wordclouds(graph, bp_mappings, output_dir="wordclouds")
     
     # Step 4: Assemble and save final plot
