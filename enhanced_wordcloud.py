@@ -10,6 +10,8 @@ from matplotlib.patches import FancyArrowPatch, Circle
 import matplotlib.image as mpimg
 from pathlib import Path
 import random
+import os
+import json
 from typing import Dict, List, Tuple
 
 class CustomWordCloud(WordCloud):
@@ -36,7 +38,8 @@ def generate_circular_wordcloud(
     colormap: str = 'viridis',
     max_words: int = 100,
     contour_width: float = 1.0,
-    contour_color: str = 'steelblue'
+    contour_color: str = 'steelblue',
+    color_func=None
 ) -> WordCloud:
     """Generate a circular word cloud with custom styling"""
     mask = 255 * (~create_circular_mask(size).astype(int))
@@ -50,6 +53,7 @@ def generate_circular_wordcloud(
         contour_width=contour_width,
         contour_color=contour_color,
         colormap=colormap,
+        color_func=color_func,
         prefer_horizontal=1.0,
         min_font_size=8,
         max_font_size=100,
@@ -116,10 +120,11 @@ def create_visualization(
         
         # Generate word cloud
         text = ' '.join(terms[:20])  # Limit number of terms
+        color = plt.cm.get_cmap('tab20')(i % 20)
         wc = generate_circular_wordcloud(
             text,
             size=400,  # Smaller size for individual word clouds
-            colormap=plt.cm.get_cmap('tab20')(i % 20),
+            color_func=get_single_color_func(mcolors.to_hex(color)),
             background_color='white',
             max_words=50
         )
@@ -138,23 +143,31 @@ def create_visualization(
     # Draw connections with curved arrows
     for source, target, weight in connections:
         if source in node_positions and target in node_positions:
+            # Skip self-loops
+            if source == target:
+                continue
+
             start = node_positions[source]
             end = node_positions[target]
+            
             # Adjust start and end points to be on the circle's edge
             direction = np.array(end) - np.array(start)
-            direction = direction / np.linalg.norm(direction)
-            start_adj = np.array(start) + direction * 50  # Radius of the node circle
-            end_adj = np.array(end) - direction * 50
+            norm_direction = np.linalg.norm(direction)
             
-            # Draw arrow with width based on weight
-            draw_curved_arrow(
-                ax, 
-                start_adj, 
-                end_adj,
-                color='#666666',
-                width=weight * 2,
-                alpha=0.5
-            )
+            if norm_direction > 0:
+                direction = direction / norm_direction
+                start_adj = np.array(start) + direction * 50  # Radius of the node circle
+                end_adj = np.array(end) - direction * 50
+                
+                # Draw arrow with width based on weight
+                draw_curved_arrow(
+                    ax, 
+                    start_adj, 
+                    end_adj,
+                    color='#666666',
+                    width=weight * 2,
+                    alpha=0.5
+                )
     
     # Add word clouds as images
     for node, (x, y) in node_positions.items():

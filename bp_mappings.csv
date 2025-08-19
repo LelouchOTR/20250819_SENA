@@ -1,0 +1,10 @@
+latent_factor,go_id,bp_name
+0,GO:0002320,GO:0002320 related process 1
+0,GO:0002320,GO:0002320 related process 2
+1,GO:0006067,GO:0006067 related process 1
+2,GO:0001958,GO:0001958 related process 1
+3,GO:0007398,GO:0007398 related process 1
+4,GO:0003096,GO:0003096 related process 1
+4,GO:0003096,GO:0003096 related process 2
+5,GO:0006359,GO:0006359 related process 1
+6,GO:0007190,GO:0007190 related process 1
