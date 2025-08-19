@@ -258,33 +258,38 @@ def create_visualization(
             )
             ax.add_artist(ab)
     
-    # Draw connections with curved arrows (on top of circles but under labels)
-    for source, target, weight in connections:
-        if source in node_positions and target in node_positions:
-            # Skip self-loops
-            if source == target:
-                continue
-
-            start = node_positions[source]
-            end = node_positions[target]
+    # Draw connections between nodes with arrowheads
+    for src, tgt, weight in connections:
+        if src in node_positions and tgt in node_positions:
+            # Extract positions from node_info
+            start_x, start_y, _ = node_positions[src]
+            end_x, end_y, _ = node_positions[tgt]
             
-            # Adjust start and end points to be on the circle's edge
+            start = (start_x, start_y)
+            end = (end_x, end_y)
+            
+            # Calculate direction vector
             direction = np.array(end) - np.array(start)
-            norm_direction = np.linalg.norm(direction)
-            
-            if norm_direction > 0:
-                direction = direction / norm_direction
-                start_adj = np.array(start) + direction * 50  # Radius of the node circle
-                end_adj = np.array(end) - direction * 50
+            distance = np.linalg.norm(direction)
+            if distance > 0:
+                direction = direction / distance
                 
-                # Draw arrow with width based on weight
+                # Get node radii
+                start_radius = node_positions[src][2]['radius']
+                end_radius = node_positions[tgt][2]['radius']
+                
+                # Adjust start and end points to be on the circle edges
+                start = np.array(start) + direction * start_radius
+                end = np.array(end) - direction * end_radius
+                
+                # Draw arrow with weight-based width
                 draw_curved_arrow(
-                    ax, 
-                    start_adj, 
-                    end_adj,
-                    color='#666666',
-                    width=weight * 2,
-                    alpha=0.5
+                    ax,
+                    tuple(start),
+                    tuple(end),
+                    color='gray',
+                    width=0.5 + weight * 2,  # Scale width with weight
+                    alpha=0.6
                 )
     
     
