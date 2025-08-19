@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 import matplotlib.image as mpimg
 import os
+from matplotlib.patches import Circle
 
 def load_causal_graph(filepath: str = "A.npy") -> np.ndarray:
     """
@@ -175,18 +176,24 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
             )
         )
     
-    # Draw word clouds
+    # Draw circular nodes with word clouds
     for node in graph.nodes():
         node_pos = pos[node]
         img_path = os.path.join(wordcloud_dir, f"wordcloud_node_{node}.png")
         
+        # Calculate node size based on importance (degree centrality)
+        node_size = nx.degree_centrality(graph)[node] * 0.3 + 0.1  # Scale for visibility
+        
+        # Draw circle around node
+        circle = Circle(node_pos, node_size, fill=False, color='red', linewidth=2)
+        ax.add_patch(circle)
+        
         if os.path.exists(img_path):
             img = mpimg.imread(img_path)
             
-            # Position image (convert data coordinates to axes coordinates)
+            # Position image within the circle
             x, y = node_pos
-            # Normalize coordinates to [0,1] for imshow
-            extent = [x-0.15, x+0.15, y-0.15, y+0.15]  # Adjust size as needed
+            extent = [x-node_size, x+node_size, y-node_size, y+node_size]
             ax.imshow(img, extent=extent, aspect='auto', zorder=2)
             
             # Add node label (latent factor number)
