@@ -42,6 +42,19 @@ def load_bp_mappings(filepath: str = "bp_mappings.csv") -> dict:
         go_dict[factor_id] = go_id
     return bp_dict, go_dict
 
+def load_bp_counts(filepath: str = "bp_counts.csv") -> dict:
+    """
+    Load biological process counts from a CSV file.
+    
+    Args:
+        filepath (str): Path to the CSV file with latent_factor and bp_count columns.
+        
+    Returns:
+        dict: Dictionary mapping latent factor IDs to BP counts.
+    """
+    df = pd.read_csv(filepath)
+    return dict(zip(df['latent_factor'], df['bp_count']))
+
 def build_filtered_graph(adjacency_matrix: np.ndarray, go_ids: list, top_k: int = 10) -> nx.DiGraph:
     """
     Create a directed graph from adjacency matrix and keep only top K edges between selected nodes.
@@ -79,20 +92,35 @@ def build_filtered_graph(adjacency_matrix: np.ndarray, go_ids: list, top_k: int 
         
     return G
 
-def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, output_dir: str = "wordclouds") -> None:
+def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, bp_counts: dict, output_dir: str = "wordclouds") -> None:
     """
     Generate circular word cloud images for each node in the graph.
+    Circle size corresponds to the number of biological processes (BPs) associated with each latent factor.
     
     Args:
         graph (nx.DiGraph): The graph containing nodes.
         bp_mappings (dict): Dictionary mapping nodes to BP names.
+        bp_counts (dict): Dictionary mapping nodes to BP counts.
         output_dir (str): Directory to save word cloud images.
     """
     os.makedirs(output_dir, exist_ok=True)
     
+    # Normalize BP counts for sizing
+    counts = [bp_counts.get(node, 0) for node in graph.nodes()]
+    max_count = max(counts) if counts else 1
+    min_count = min(counts) if counts else 0
+    
     for node in graph.nodes():
         # Get BP names for this node
         bp_names = bp_mappings.get(node, [])
+        bp_count = bp_counts.get(node, 0)
+        
+        # Calculate relative size based on BP count
+        # Normalize between 0.15 and 0.35
+        if max_count == min_count:
+            node_size = 0.25
+        else:
+            node_size = 0.15 + (bp_count - min_count) / (max_count - min_count) * 0.20
         
         # Skip if no BP names
         if not bp_names:
@@ -132,14 +160,16 @@ def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, output_dir: str = 
                     bbox_inches='tight', pad_inches=0, dpi=150)
         plt.close()
 
-def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str = "wordclouds", 
+def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, bp_counts: dict, wordcloud_dir: str = "wordclouds", 
                        output_path: str = "causal_graph_wordcloud.png") -> None:
     """
     Assemble the final plot with circular word clouds as nodes and latent factor labels.
+    Circle size corresponds to the number of biological processes (BPs) associated with each latent factor.
     
     Args:
         graph (nx.DiGraph): The filtered graph with edge weights.
         go_mappings (dict): Dictionary mapping nodes to GO IDs.
+        bp_counts (dict): Dictionary mapping nodes to BP counts.
         wordcloud_dir (str): Directory containing word cloud images.
         output_path (str): Path to save the final composite image.
     """
@@ -152,21 +182,34 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
     # Determine axis limits based on positions
     x_coords = [pos[node][0] for node in pos]
     y_coords = [pos[node][1] for node in pos]
-    x_margin = (max(x_coords) - min(x_coords)) * 0.15
-    y_margin = (max(y_coords) - min(y_coords)) * 0.15
+    x_margin = (max(x_coords) - min(x_coords)) * 0.2
+    y_margin = (max(y_coords) - min(y_coords)) * 0.2
     ax.set_xlim(min(x_coords) - x_margin, max(x_coords) + x_margin)
     ax.set_ylim(min(y_coords) - y_margin, max(y_coords) + y_margin)
+    
+    # Normalize BP counts for sizing
+    counts = [bp_counts.get(node, 0) for node in graph.nodes()]
+    max_count = max(counts) if counts else 1
+    min_count = min(counts) if counts else 0
     
     # Draw edges with improved styling - now ending at circle edges
     edge_weights = [abs(graph[u][v]['weight']) for u, v in graph.edges()]
     max_weight = max(edge_weights) if edge_weights else 1
-    node_size = 0.25  # Consistent with node size used later
     
     for edge in graph.edges(data=True):
         src, dst, data = edge
         src_pos = pos[src]
         dst_pos = pos[dst]
         weight = abs(data['weight'])
+        
+        # Calculate node sizes for this edge
+        if max_count == min_count:
+            src_size = dst_size = 0.25
+        else:
+            src_count = bp_counts.get(src, 0)
+            dst_count = bp_counts.get(dst, 0)
+            src_size = 0.15 + (src_count - min_count) / (max_count - min_count) * 0.20
+            dst_size = 0.15 + (dst_count - min_count) / (max_count - min_count) * 0.20
         
         # Calculate direction vector
         dx = dst_pos[0] - src_pos[0]
@@ -179,23 +222,23 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
             dy /= distance
             
             # Calculate where arrow should start and end (at circle edges)
-            src_edge = (src_pos[0] + dx * node_size, src_pos[1] + dy * node_size)
-            dst_edge = (dst_pos[0] - dx * node_size, dst_pos[1] - dy * node_size)
+            src_edge = (src_pos[0] + dx * src_size, src_pos[1] + dy * src_size)
+            dst_edge = (dst_pos[0] - dx * dst_size, dst_pos[1] - dy * dst_size)
         else:
             # Fallback if positions are the same
             src_edge = src_pos
             dst_edge = dst_pos
         
         # Better scaling for visibility with reduced thickness
-        linewidth = 0.5 + (weight / max_weight) * 3  # Reduced from previous values
-        alpha = 0.4 + (weight / max_weight) * 0.6    # Slightly increased minimum alpha
+        linewidth = 0.5 + (weight / max_weight) * 3
+        alpha = 0.4 + (weight / max_weight) * 0.6
         
         ax.annotate(
             '',
             xy=dst_edge,
             xytext=src_edge,
             arrowprops=dict(
-                arrowstyle='->,head_width=0.3,head_length=0.4',  # Smaller arrowhead
+                arrowstyle='->,head_width=0.3,head_length=0.4',
                 lw=linewidth,
                 color='black',
                 alpha=alpha,
@@ -208,10 +251,14 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
         node_pos = pos[node]
         img_path = os.path.join(wordcloud_dir, f"wordcloud_node_{node}.png")
         
-        # Consistent node sizing for uniformity
-        node_size = 0.25
+        # Calculate node size based on BP count
+        bp_count = bp_counts.get(node, 0)
+        if max_count == min_count:
+            node_size = 0.25
+        else:
+            node_size = 0.15 + (bp_count - min_count) / (max_count - min_count) * 0.20
         
-        # Draw circle around node
+        # Draw circle around node with size proportional to BP count
         circle = Circle(node_pos, node_size, fill=False, color='red', linewidth=2)
         ax.add_patch(circle)
         
@@ -246,6 +293,7 @@ def main():
     # Step 1: Load model outputs
     adjacency_matrix = load_causal_graph("A.npy")
     bp_mappings, go_mappings = load_bp_mappings("bp_mappings.csv")
+    bp_counts = load_bp_counts("bp_counts.csv")
     
     # Get GO IDs for the selected latent factors
     go_ids = [go_mappings[i] for i in go_mappings.keys()]
@@ -254,10 +302,10 @@ def main():
     graph = build_filtered_graph(adjacency_matrix, go_ids, top_k=15)
     
     # Step 3: Generate circular word clouds for nodes
-    generate_wordclouds(graph, bp_mappings, output_dir="wordclouds")
+    generate_wordclouds(graph, bp_mappings, bp_counts, output_dir="wordclouds")
     
     # Step 4: Assemble and save final plot
-    assemble_final_plot(graph, go_mappings, wordcloud_dir="wordclouds", 
+    assemble_final_plot(graph, go_mappings, bp_counts, wordcloud_dir="wordclouds", 
                        output_path="causal_graph_wordcloud.png")
 
 if __name__ == "__main__":

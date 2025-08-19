@@ -36,6 +36,7 @@ def extract_graph_data(model_name="example"):
     
     # Create BP mappings for top GO terms only
     bp_mappings = []
+    bp_counts = []  # To store the number of BPs for each latent factor
     
     for i, go_term in enumerate(top_gos):
         # Get genes associated with this GO term
@@ -43,6 +44,9 @@ def extract_graph_data(model_name="example"):
         
         # Convert Ensembl IDs to gene names
         gene_names = [ensembl_to_gene_name.get(gene_id, gene_id) for gene_id in genes_in_go]
+        
+        # Store the count of associated genes (BPs)
+        bp_counts.append(len(gene_names))
         
         # Create a descriptive name for the GO term based on associated genes
         if gene_names:
@@ -64,6 +68,14 @@ def extract_graph_data(model_name="example"):
     bp_df = pd.DataFrame(bp_mappings)
     bp_df.to_csv('bp_mappings.csv', index=False)
     print("Saved BP mappings to bp_mappings.csv")
+    
+    # Save BP counts for circle sizing
+    bp_counts_df = pd.DataFrame({
+        'latent_factor': range(len(bp_counts)),
+        'bp_count': bp_counts
+    })
+    bp_counts_df.to_csv('bp_counts.csv', index=False)
+    print("Saved BP counts to bp_counts.csv")
 
     # Also save the full GO to gene mapping for reference
     print("\nTop GO term mappings:")
