@@ -209,12 +209,11 @@ def create_visualization(
                 fontsize=max(10, int(circle_radius/3)),  # Scale font size with circle
                 fontweight='bold',
                 color='black',
-                zorder=3)  # Ensure text is above the circle
                 zorder=3)  # Above the circle, below the word cloud
         
         # Add node label
         ax.text(x, y - circle_radius - 20,  # Position above the circle
-               node, 
+               f"Factor {node}", 
                ha='center', va='bottom',
                fontsize=10, fontweight='bold',
                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'),
