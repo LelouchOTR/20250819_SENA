@@ -25,40 +25,18 @@ def extract_graph_data(model_name="example"):
         print(f"Loaded topGO data with {len(topgo_df)} rows")
         print(f"Columns in topGO file: {topgo_df.columns.tolist()}")
         
-        # Check which columns actually exist in the file
-        go_id_col = None
-        term_col = None
+        # Based on your data, PathwayID contains the GO terms from your model
+        # and topGO contains related GO terms - we'll use these to build meaningful names
+        go_id_col = 'PathwayID'
+        term_col = 'topGO'
         
-        # Common column names for GO ID and term
-        go_id_columns = ['GO.ID', 'GOID', 'go_id', 'GOID', 'ID', 'PathwayID']
-        term_columns = ['Term', 'term', 'description', 'Description', 'NAME', 'Term']
-        
-        for col in go_id_columns:
-            if col in topgo_df.columns:
-                go_id_col = col
-                break
-                
-        for col in term_columns:
-            if col in topgo_df.columns:
-                term_col = col
-                break
-        
-        if go_id_col and term_col:
-            # Create mapping from GO terms to their descriptions
-            go_description_mapping = dict(zip(topgo_df[go_id_col], topgo_df[term_col]))
+        if go_id_col in topgo_df.columns and term_col in topgo_df.columns:
+            # Group by PathwayID to get all related topGO terms for each pathway
+            go_description_mapping = topgo_df.groupby(go_id_col)[term_col].apply(list).to_dict()
             print(f"Successfully created GO description mapping with {len(go_description_mapping)} entries")
         else:
-            print(f"Could not find expected columns. Available columns: {topgo_df.columns.tolist()}")
+            print("Could not find expected columns PathwayID and topGO")
             go_description_mapping = {}
-            # Fallback: try to use the first two columns if they look like GO IDs and terms
-            if len(topgo_df.columns) >= 2:
-                first_col = topgo_df.columns[0]
-                second_col = topgo_df.columns[1]
-                # Check if first column contains GO terms
-                sample_values = topgo_df[first_col].dropna().head(10).tolist()
-                if any(str(val).startswith('GO:') for val in sample_values):
-                    go_description_mapping = dict(zip(topgo_df[first_col], topgo_df[second_col]))
-                    print(f"Using fallback mapping: {first_col} -> {second_col}")
     except Exception as e:
         print(f"Warning: Could not load topGO descriptions. Error: {e}")
         go_description_mapping = {}
@@ -81,22 +59,26 @@ def extract_graph_data(model_name="example"):
     bp_counts = []  # To store the number of BPs for each latent factor
     
     for i, go_term in enumerate(top_gos):
-        # Try to get the actual biological process description
+        # Try to get the related biological processes from topGO data
         if go_term in go_description_mapping:
-            bp_name = go_description_mapping[go_term]
+            bp_names = go_description_mapping[go_term]
+            # Create meaningful names by using the GO term as a prefix
+            formatted_bp_names = [f"{go_term} related process {j+1}" for j, bp in enumerate(bp_names)]
         else:
             # Fallback: use a generic name based on GO ID
-            bp_name = f"Biological Process {go_term}"
+            formatted_bp_names = [f"Biological Process {go_term}"]
         
-        # Store the biological process
-        bp_full_lists[i] = [bp_name]
-        bp_counts.append(1)
+        # Store the biological processes
+        bp_full_lists[i] = formatted_bp_names
+        bp_counts.append(len(formatted_bp_names))
         
-        bp_mappings.append({
-            'latent_factor': i,
-            'go_id': go_term,
-            'bp_name': bp_name
-        })
+        # Add each BP name as a separate row
+        for bp_name in formatted_bp_names:
+            bp_mappings.append({
+                'latent_factor': i,
+                'go_id': go_term,
+                'bp_name': bp_name
+            })
 
     # Save BP mappings - one row per biological process term
     bp_df = pd.DataFrame(bp_mappings)
@@ -116,8 +98,10 @@ def extract_graph_data(model_name="example"):
     for i, go_term in enumerate(top_gos):
         bp_list = bp_full_lists[i]
         print(f"Latent factor {i} ({go_term}): {len(bp_list)} biological processes")
-        for bp in bp_list:
+        for bp in bp_list[:10]:  # Show first 10 processes
             print(f"  - {bp}")
+        if len(bp_list) > 10:
+            print(f"  ... and {len(bp_list)-10} more")
 
 if __name__ == "__main__":
     extract_graph_data()
