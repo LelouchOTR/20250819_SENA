@@ -109,17 +109,19 @@ def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, output_dir: str = 
         # Create text from BP names (join all names into one string)
         text = ' '.join(bp_names)
         
-        # Generate circular word cloud
+        # Generate circular word cloud with improved readability
         wordcloud = WordCloud(
-            width=400,
-            height=400,
+            width=600,
+            height=600,
             background_color='white',
-            colormap='viridis',
-            prefer_horizontal=1.0,
+            colormap='tab10',
+            prefer_horizontal=0.7,
             random_state=42,
             relative_scaling=0.5,
-            max_font_size=80,
-            mask=None  # Will create circular shape by default
+            max_font_size=60,
+            min_font_size=12,
+            scale=2,
+            collocations=False
         ).generate(text)
         
         # Save word cloud image
@@ -127,7 +129,7 @@ def generate_wordclouds(graph: nx.DiGraph, bp_mappings: dict, output_dir: str = 
         plt.imshow(wordcloud, interpolation='bilinear')
         plt.axis('off')
         plt.savefig(os.path.join(output_dir, f"wordcloud_node_{node}.png"), 
-                    bbox_inches='tight', pad_inches=0, dpi=100)
+                    bbox_inches='tight', pad_inches=0, dpi=150)
         plt.close()
 
 def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str = "wordclouds", 
@@ -142,37 +144,43 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
         output_path (str): Path to save the final composite image.
     """
     # Calculate node positions using spring layout
-    pos = nx.spring_layout(graph, seed=42, k=3)
+    pos = nx.spring_layout(graph, seed=42, k=3, iterations=50)
     
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig, ax = plt.subplots(figsize=(14, 12))
     
     # Determine axis limits based on positions
     x_coords = [pos[node][0] for node in pos]
     y_coords = [pos[node][1] for node in pos]
-    x_margin = (max(x_coords) - min(x_coords)) * 0.1
-    y_margin = (max(y_coords) - min(y_coords)) * 0.1
+    x_margin = (max(x_coords) - min(x_coords)) * 0.15
+    y_margin = (max(y_coords) - min(y_coords)) * 0.15
     ax.set_xlim(min(x_coords) - x_margin, max(x_coords) + x_margin)
     ax.set_ylim(min(y_coords) - y_margin, max(y_coords) + y_margin)
     
-    # Draw edges
+    # Draw edges with improved styling
+    edge_weights = [abs(graph[u][v]['weight']) for u, v in graph.edges()]
+    max_weight = max(edge_weights) if edge_weights else 1
+    
     for edge in graph.edges(data=True):
         src, dst, data = edge
         src_pos = pos[src]
         dst_pos = pos[dst]
-        weight = data['weight']
+        weight = abs(data['weight'])
         
-        # Draw arrow
+        # Better scaling for visibility
+        linewidth = 1 + (weight / max_weight) * 8
+        alpha = 0.3 + (weight / max_weight) * 0.7
+        
         ax.annotate(
             '',
             xy=dst_pos,
             xytext=src_pos,
             arrowprops=dict(
-                arrowstyle='->',
-                lw=max(1.0, abs(weight) * 5),  # Scale line width with weight
+                arrowstyle='->,head_width=0.4,head_length=0.6',
+                lw=linewidth,
                 color='black',
-                alpha=min(1.0, abs(weight) * 3),  # Scale transparency with weight
-                connectionstyle='arc3,rad=0.1'
+                alpha=alpha,
+                connectionstyle='arc3,rad=0.15'
             )
         )
     
@@ -181,8 +189,8 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
         node_pos = pos[node]
         img_path = os.path.join(wordcloud_dir, f"wordcloud_node_{node}.png")
         
-        # Calculate node size based on importance (degree centrality)
-        node_size = nx.degree_centrality(graph)[node] * 0.3 + 0.1  # Scale for visibility
+        # Consistent node sizing for uniformity
+        node_size = 0.25
         
         # Draw circle around node
         circle = Circle(node_pos, node_size, fill=False, color='red', linewidth=2)
@@ -191,21 +199,26 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
         if os.path.exists(img_path):
             img = mpimg.imread(img_path)
             
-            # Position image within the circle
+            # Position image within the circle with padding
             x, y = node_pos
-            extent = [x-node_size, x+node_size, y-node_size, y+node_size]
+            padding = 0.02
+            extent = [x-node_size+padding, x+node_size-padding, 
+                      y-node_size+padding, y+node_size-padding]
             ax.imshow(img, extent=extent, aspect='auto', zorder=2)
             
-            # Add node label (latent factor number)
+            # Add node label (latent factor number) with better contrast
             ax.text(x, y, str(node), 
                     ha='center', va='center', 
-                    fontsize=14, 
-                    color='red', 
+                    fontsize=16, 
+                    color='white', 
                     weight='bold',
-                    zorder=3)
+                    zorder=3,
+                    bbox=dict(boxstyle="circle,pad=0.1", facecolor='red', alpha=0.8))
     
+    ax.set_title("SENA-discrepancy-VAE Causal Graph on Norman2019 Data", 
+                fontsize=18, pad=20, weight='bold')
     ax.axis('off')
-    plt.tight_layout()
+    plt.tight_layout(pad=3.0)
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
 
