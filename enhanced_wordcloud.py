@@ -39,7 +39,9 @@ def generate_circular_wordcloud(
     max_words: int = 100,
     contour_width: float = 1.0,
     contour_color: str = 'steelblue',
-    color_func=None
+    color_func=None,
+    min_font_size: int = 8,
+    max_font_size: int = 100
 ) -> WordCloud:
     """Generate a circular word cloud with custom styling"""
     mask = 255 * (~create_circular_mask(size).astype(int))
@@ -55,8 +57,8 @@ def generate_circular_wordcloud(
         colormap=colormap,
         color_func=color_func,
         prefer_horizontal=1.0,
-        min_font_size=8,
-        max_font_size=100,
+        min_font_size=min_font_size,
+        max_font_size=max_font_size,
         relative_scaling=0.5,
         random_state=42
     )
@@ -253,21 +255,7 @@ def create_visualization(
                     alpha=0.5
                 )
     
-    # Add word clouds as images
-    for node, (x, y) in node_positions.items():
-        if node in wordclouds:
-            # Convert word cloud to image
-            img = wordclouds[node].to_array()
-            
-            # Create offset image
-            imagebox = OffsetImage(img, zoom=0.4, resample=True)
-            ab = AnnotationBbox(
-                imagebox, 
-                (x, y),
-                frameon=False,
-                box_alignment=(0.5, 0.5)
-            )
-            ax.add_artist(ab)
+    
     
     # Set axis limits and remove ticks
     ax.set_xlim(0, size)
