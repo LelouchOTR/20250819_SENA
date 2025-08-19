@@ -22,12 +22,47 @@ def extract_graph_data(model_name="example"):
     # Load topGO results which should contain the actual biological process descriptions
     try:
         topgo_df = pd.read_csv('data/topGO_uhler.tsv', sep='\t')
-        # Create mapping from GO terms to their descriptions
-        go_description_mapping = dict(zip(topgo_df['GO.ID'], topgo_df['Term']))
-    except:
-        # Fallback if topGO file doesn't exist or has different format
+        print(f"Loaded topGO data with {len(topgo_df)} rows")
+        print(f"Columns in topGO file: {topgo_df.columns.tolist()}")
+        
+        # Check which columns actually exist in the file
+        go_id_col = None
+        term_col = None
+        
+        # Common column names for GO ID and term
+        go_id_columns = ['GO.ID', 'GOID', 'go_id', 'GOID', 'ID', 'PathwayID']
+        term_columns = ['Term', 'term', 'description', 'Description', 'NAME', 'Term']
+        
+        for col in go_id_columns:
+            if col in topgo_df.columns:
+                go_id_col = col
+                break
+                
+        for col in term_columns:
+            if col in topgo_df.columns:
+                term_col = col
+                break
+        
+        if go_id_col and term_col:
+            # Create mapping from GO terms to their descriptions
+            go_description_mapping = dict(zip(topgo_df[go_id_col], topgo_df[term_col]))
+            print(f"Successfully created GO description mapping with {len(go_description_mapping)} entries")
+        else:
+            print(f"Could not find expected columns. Available columns: {topgo_df.columns.tolist()}")
+            go_description_mapping = {}
+            # Fallback: try to use the first two columns if they look like GO IDs and terms
+            if len(topgo_df.columns) >= 2:
+                first_col = topgo_df.columns[0]
+                second_col = topgo_df.columns[1]
+                # Check if first column contains GO terms
+                sample_values = topgo_df[first_col].dropna().head(10).tolist()
+                if any(str(val).startswith('GO:') for val in sample_values):
+                    go_description_mapping = dict(zip(topgo_df[first_col], topgo_df[second_col]))
+                    print(f"Using fallback mapping: {first_col} -> {second_col}")
+    except Exception as e:
+        print(f"Warning: Could not load topGO descriptions. Error: {e}")
         go_description_mapping = {}
-        print("Warning: Could not load topGO descriptions. Using GO IDs as process names.")
+        print("Using GO IDs as process names.")
 
     # Get GO terms from the model data (these are the latent factors)
     gos = data['fc1'].columns.tolist()  # GO terms from fc1 layer
