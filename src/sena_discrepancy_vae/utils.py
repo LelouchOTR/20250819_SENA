@@ -13,7 +13,7 @@ from torch.utils.data.sampler import Sampler
 
 class Norman2019DataLoader:
     def __init__(
-        self, num_gene_th=5, batch_size=32, dataname="Norman2019_raw"
+        self, num_gene_th=5, batch_size=32, dataname="Norman2019_reduced"
     ):
         self.num_gene_th = num_gene_th
         self.batch_size = batch_size

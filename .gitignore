@@ -35,3 +35,4 @@ src/old/
 src/second_dataset/
 
 anonymize/
+.aider*

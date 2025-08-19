@@ -52,19 +52,33 @@ def train(
     logger.info(f"Training for {opts.epochs} epochs...")
 
     # Loss parameter schedules
-    beta_schedule = torch.cat(
-        [torch.zeros(10), torch.linspace(0, opts.mxBeta, opts.epochs - 10)]
-    )
-    alpha_schedule = torch.cat(
-        [
-            torch.zeros(5),
-            torch.linspace(0, opts.mxAlpha, int(opts.epochs / 2) - 5),
-            torch.full((opts.epochs - int(opts.epochs / 2),), opts.mxAlpha),
-        ]
-    )
-    temp_schedule = torch.cat(
-        [torch.ones(5), torch.linspace(1, opts.mxTemp, opts.epochs - 5)]
-    )
+    if opts.epochs <= 10:
+        beta_schedule = torch.zeros(opts.epochs)
+    else:
+        beta_schedule = torch.cat(
+            [torch.zeros(10), torch.linspace(0, opts.mxBeta, opts.epochs - 10)]
+        )
+
+    if opts.epochs <= 5:
+        alpha_schedule = torch.zeros(opts.epochs)
+    else:
+        num_linspace_alpha_steps = max(0, int(opts.epochs / 2) - 5)
+        num_full_alpha_steps = max(0, opts.epochs - int(opts.epochs / 2))
+        alpha_schedule = torch.cat(
+            [
+                torch.zeros(5),
+                torch.linspace(0, opts.mxAlpha, num_linspace_alpha_steps),
+                torch.full((num_full_alpha_steps,), opts.mxAlpha),
+            ]
+        )
+
+    if opts.epochs <= 5:
+        temp_schedule = torch.ones(opts.epochs)
+    else:
+        num_linspace_temp_steps = max(0, opts.epochs - 5)
+        temp_schedule = torch.cat(
+            [torch.ones(5), torch.linspace(1, opts.mxTemp, num_linspace_temp_steps)]
+        )
 
     min_train_loss = np.inf
 
