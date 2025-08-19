@@ -19,15 +19,16 @@ def extract_graph_data(model_name="example"):
     # Load GO term to gene mappings from your existing data
     go_gene_df = pd.read_csv('data/go_kegg_gene_map.tsv', sep='\t')
     
-    # Create mapping from GO terms to biological process descriptions
-    # We'll use the GO term itself as the biological process name for now
-    # In a real implementation, you'd map GO IDs to their actual descriptions
-    go_bp_mapping = {}
-    for go_term in go_gene_df['PathwayID'].unique():
-        # For demonstration, we'll use the GO term ID as the process name
-        # You should replace this with actual GO term descriptions from an ontology file
-        go_bp_mapping[go_term] = [f"GO biological process {go_term}"]
-    
+    # Load topGO results which should contain the actual biological process descriptions
+    try:
+        topgo_df = pd.read_csv('data/topGO_uhler.tsv', sep='\t')
+        # Create mapping from GO terms to their descriptions
+        go_description_mapping = dict(zip(topgo_df['GO.ID'], topgo_df['Term']))
+    except:
+        # Fallback if topGO file doesn't exist or has different format
+        go_description_mapping = {}
+        print("Warning: Could not load topGO descriptions. Using GO IDs as process names.")
+
     # Get GO terms from the model data (these are the latent factors)
     gos = data['fc1'].columns.tolist()  # GO terms from fc1 layer
     
@@ -45,20 +46,22 @@ def extract_graph_data(model_name="example"):
     bp_counts = []  # To store the number of BPs for each latent factor
     
     for i, go_term in enumerate(top_gos):
-        # Get biological processes associated with this GO term
-        bp_names = go_bp_mapping.get(go_term, [go_term])
-        bp_full_lists[i] = bp_names
+        # Try to get the actual biological process description
+        if go_term in go_description_mapping:
+            bp_name = go_description_mapping[go_term]
+        else:
+            # Fallback: use a generic name based on GO ID
+            bp_name = f"Biological Process {go_term}"
         
-        # Store the count of associated biological processes
-        bp_counts.append(len(bp_names))
+        # Store the biological process
+        bp_full_lists[i] = [bp_name]
+        bp_counts.append(1)
         
-        # For the CSV, we'll store each BP term as a separate row
-        for bp_name in bp_names:
-            bp_mappings.append({
-                'latent_factor': i,
-                'go_id': go_term,
-                'bp_name': bp_name
-            })
+        bp_mappings.append({
+            'latent_factor': i,
+            'go_id': go_term,
+            'bp_name': bp_name
+        })
 
     # Save BP mappings - one row per biological process term
     bp_df = pd.DataFrame(bp_mappings)
@@ -76,13 +79,10 @@ def extract_graph_data(model_name="example"):
     # Print summary of top GO terms and their biological processes
     print("\nTop GO term biological processes:")
     for i, go_term in enumerate(top_gos):
-        bp_list = go_bp_mapping.get(go_term, [go_term])
+        bp_list = bp_full_lists[i]
         print(f"Latent factor {i} ({go_term}): {len(bp_list)} biological processes")
-        # Show first few processes
-        for bp in bp_list[:10]:
+        for bp in bp_list:
             print(f"  - {bp}")
-        if len(bp_list) > 10:
-            print(f"  ... and {len(bp_list)-10} more")
 
 if __name__ == "__main__":
     extract_graph_data()
