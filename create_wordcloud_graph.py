@@ -55,7 +55,7 @@ def load_bp_counts(filepath: str = "bp_counts.csv") -> dict:
     df = pd.read_csv(filepath)
     return dict(zip(df['latent_factor'], df['bp_count']))
 
-def build_filtered_graph(adjacency_matrix: np.ndarray, go_ids: list, top_k: int = 10) -> nx.DiGraph:
+def build_filtered_graph(adjacency_matrix: np.ndarray, go_ids: list, top_k: int = 15) -> nx.DiGraph:
     """
     Create a directed graph from adjacency matrix and keep only top K edges between selected nodes.
     
@@ -390,8 +390,14 @@ def main():
     # Get GO IDs for the selected latent factors
     go_ids = [go_mappings[i] for i in go_mappings.keys()]
     
-    # Step 2: Build and filter graph
+    # Step 2: Build and filter graph - limit to exactly 7 nodes as requested
     graph = build_filtered_graph(adjacency_matrix, go_ids, top_k=15)
+    
+    # Limit to exactly 7 nodes/circles as requested
+    if len(graph.nodes()) > 7:
+        # Keep only the first 7 nodes
+        nodes_to_keep = list(graph.nodes())[:7]
+        graph = graph.subgraph(nodes_to_keep).copy()
     
     # Step 3: Generate circular word clouds for nodes
     generate_wordclouds(graph, bp_mappings, bp_counts, output_dir="wordclouds")
