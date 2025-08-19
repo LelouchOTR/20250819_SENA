@@ -106,12 +106,29 @@ def create_visualization(
     node_positions = {}
     wordclouds = {}
     
+    # Get all BP counts to normalize sizes
+    all_bp_counts = [node_data.get('bp_count', 1) for node_data in data.values()]
+    min_size, max_size = 30, 150  # Min and max circle sizes
+    
+    # If all counts are the same, use a default size
+    if len(set(all_bp_counts)) == 1:
+        all_bp_counts = [50] * len(all_bp_counts)  # Default size if no variation
+    else:
+        # Normalize BP counts to be between min_size and max_size
+        min_bp, max_bp = min(all_bp_counts), max(all_bp_counts)
+        all_bp_counts = [min_size + (count - min_bp) * (max_size - min_size) / (max_bp - min_bp) 
+                        for count in all_bp_counts]
+    
     # Distribute nodes in a circle
     n_nodes = len(data)
     radius = size * 0.4
     center = (size/2, size/2)
     
-    for i, (node, terms) in enumerate(data.items()):
+    for i, (node, node_data) in enumerate(data.items()):
+        # Get terms and BP count for this node
+        terms = node_data.get('terms', [])
+        bp_count = node_data.get('bp_count', 1)
+        
         # Calculate position on circle
         angle = 2 * np.pi * i / n_nodes
         x = center[0] + radius * np.cos(angle)
@@ -130,8 +147,9 @@ def create_visualization(
         )
         wordclouds[node] = wc
         
-        # Add node circle
-        circle = Circle((x, y), 50, color=colors[i % len(colors)], alpha=0.2, zorder=1)
+        # Add node circle with size based on BP count
+        circle_size = all_bp_counts[i]
+        circle = Circle((x, y), circle_size/2, color=colors[i % len(colors)], alpha=0.2, zorder=1)
         ax.add_patch(circle)
         
         # Add node label
@@ -235,18 +253,51 @@ def load_example_data() -> Tuple[Dict, List]:
     return data, connections
 
 def load_visualization_data(data_dir='output'):
-    """Load visualization data from JSON files"""
+    """
+    Load visualization data from JSON files
+    
+    Returns:
+        tuple: (nodes_dict, connections_list) where nodes_dict is a dictionary
+        with node names as keys and a dictionary of {'terms': list, 'bp_count': int} as values,
+        and connections_list is a list of (source, target, weight) tuples
+    """
     # Load nodes data
-    with open(os.path.join(data_dir, 'nodes.json'), 'r') as f:
+    nodes_path = os.path.join(data_dir, 'nodes.json')
+    connections_path = os.path.join(data_dir, 'connections.json')
+    
+    if not os.path.exists(nodes_path) or not os.path.exists(connections_path):
+        raise FileNotFoundError(
+            f"Required files not found in {data_dir}. "
+            f"Make sure to run extract_graph_data.py first."
+        )
+    
+    with open(nodes_path, 'r') as f:
         nodes = json.load(f)
     
+    # Ensure nodes have the expected structure
+    for node_name, node_data in nodes.items():
+        if isinstance(node_data, list):
+            # Convert old format to new format
+            nodes[node_name] = {
+                'terms': node_data,
+                'bp_count': len(node_data)
+            }
+    
     # Load connections data
-    with open(os.path.join(data_dir, 'connections.json'), 'r') as f:
+    with open(connections_path, 'r') as f:
         connections_data = json.load(f)
     
     # Convert connections to the expected format
     connections = [(c['source'], c['target'], c['weight']) 
                   for c in connections_data]
+    
+    print(f"Loaded {len(nodes)} nodes and {len(connections)} connections")
+    
+    # Print node information for debugging
+    print("\nNode information:")
+    for i, (node_name, node_data) in enumerate(nodes.items()):
+        bp_count = node_data.get('bp_count', len(node_data.get('terms', [])))
+        print(f"{node_name}: {bp_count} biological processes")
     
     return nodes, connections
 

@@ -134,12 +134,20 @@ def prepare_visualization_data(go_terms, causal_graph, top_indices, go_gene_df, 
     return nodes, connections
 
 def save_visualization_data(nodes, connections, output_dir='output'):
-    """Save visualization data to JSON format"""
+    """Save visualization data to JSON format with BP counts"""
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Prepare nodes data with BP counts
+    nodes_data = {}
+    for node_name, terms in nodes.items():
+        nodes_data[node_name] = {
+            'terms': terms,
+            'bp_count': len(terms)  # Number of biological processes/terms
+        }
     
     # Save nodes data
     with open(os.path.join(output_dir, 'nodes.json'), 'w') as f:
-        json.dump(nodes, f, indent=2)
+        json.dump(nodes_data, f, indent=2)
     
     # Save connections data
     connections_data = [{"source": src, "target": tgt, "weight": float(w)} 
