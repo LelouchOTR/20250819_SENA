@@ -65,24 +65,25 @@ def generate_circular_wordcloud(
     
     return wc.generate_from_text(text)
 
-def draw_curved_arrow(ax, start, end, color='gray', width=1.0, alpha=0.6):
-    """Draw a curved arrow between two points with arrowhead"""
+def draw_curved_arrow(ax, start, end, color='#555555', width=1.0, alpha=0.8):
+    """Draw a curved arrow between two points with enhanced arrowhead"""
     # Calculate direction vector
     dx = end[0] - start[0]
     dy = end[1] - start[1]
     
-    # Create arrow with arrowhead
+    # Create arrow with more visible arrowhead
     arrow = FancyArrowPatch(
         start, 
         end,
-        arrowstyle='-|>',  # This adds an arrowhead
+        arrowstyle='-|>',
         color=color,
-        linewidth=width,
+        linewidth=width * 1.5,  # Slightly thicker line
         alpha=alpha,
-        mutation_scale=15,  # Controls the size of the arrowhead
+        mutation_scale=25,  # Larger arrowhead
         connectionstyle=f'arc3,rad={0.2}',
-        shrinkA=15,  # Distance from start point to arrow start
-        shrinkB=15   # Distance from end point to arrow tip
+        shrinkA=10,  # Reduced from 15
+        shrinkB=10,  # Reduced from 15
+        zorder=4  # Ensure arrows are above nodes but below labels
     )
     ax.add_patch(arrow)
 
@@ -220,8 +221,8 @@ def create_visualization(
         if node in wordclouds:
             wc, wc_size = wordclouds[node]
             
-            # Add label at the top edge of the word cloud
-            label_y = y + (wc_size // 2) + 15  # Position above the word cloud
+            # Add label at the top edge of the word cloud with reduced padding
+            label_y = y + (wc_size // 2) + 5  # Reduced from 15 to 5
             ax.text(x, label_y, 
                    node_info['label'],  # Use the cleaned label
                    ha='center', 
@@ -233,7 +234,7 @@ def create_visualization(
                        facecolor='white',
                        alpha=0.9,
                        edgecolor='none',
-                       boxstyle='round,pad=0.3',
+                       boxstyle='round,pad=0.1',  # Reduced padding
                        linewidth=0
                    ),
                    zorder=5)  # Above everything else
