@@ -191,33 +191,37 @@ def create_visualization(
         circle_diameter = all_bp_sizes[i]
         circle_radius = circle_diameter / 2
         
-        # Create a perfect circle with the scaled size
+        # Create a perfect circle with the scaled size and subtle glow effect
         circle = Circle(
             (x, y), 
             radius=circle_radius,
             facecolor=colors[i % len(colors)],
-            alpha=0.3,
+            alpha=0.2,  # More subtle fill
             zorder=1,
-            linewidth=2,
-            edgecolor=colors[i % len(colors)]
+            linewidth=1.5,
+            edgecolor=colors[i % len(colors)],
+            linestyle='-',
+            antialiased=True
         )
         ax.add_patch(circle)
         
-        # Add latent factor number in the center of the circle with a clean white background
-        ax.text(x, y, f"{node}",
-                ha='center', 
-                va='center',
-                fontsize=max(12, int(circle_radius/2.5)),  # Slightly larger font
-                fontweight='bold',
-                color='black',
-                bbox=dict(
-                    facecolor='white',
-                    alpha=0.8,
-                    edgecolor=colors[i % len(colors)],
-                    boxstyle='circle,pad=0.3',
-                    linewidth=1.5
-                ),
-                zorder=3)  # Above the circle, below the word cloud
+        # Add node label above the circle with a clean, modern look
+        label_y_offset = circle_radius + 15  # Position above the circle
+        ax.text(x, y + label_y_offset, 
+               f"LF {node}",  # Using LF prefix for Latent Factor
+               ha='center', 
+               va='bottom',
+               fontsize=10,
+               fontweight='bold',
+               color=colors[i % len(colors)],  # Match node color
+               bbox=dict(
+                   facecolor='white',
+                   alpha=0.9,
+                   edgecolor='none',
+                   boxstyle='round,pad=0.3',
+                   linewidth=0
+               ),
+               zorder=5)  # Above everything else
     
     # Add word clouds with higher zorder to be on top of circles
     for i, (node, (x, y)) in enumerate(node_positions.items()):
