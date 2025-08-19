@@ -108,16 +108,27 @@ def create_visualization(
     
     # Get all BP counts to normalize sizes
     all_bp_counts = [node_data.get('bp_count', 1) for node_data in data.values()]
-    min_size, max_size = 30, 150  # Min and max circle sizes
+    min_size, max_size = 30, 150  # Min and max circle sizes (diameter)
+    
+    print("\nBP Counts before scaling:", all_bp_counts)
+    
+    # Calculate scaling factors
+    min_bp, max_bp = min(all_bp_counts), max(all_bp_counts)
+    print(f"Min BP: {min_bp}, Max BP: {max_bp}")
     
     # If all counts are the same, use a default size
-    if len(set(all_bp_counts)) == 1:
-        all_bp_counts = [50] * len(all_bp_counts)  # Default size if no variation
+    if min_bp == max_bp:
+        print("All BP counts are the same, using default sizes")
+        all_bp_sizes = [80] * len(all_bp_counts)  # Default size if no variation
     else:
-        # Normalize BP counts to be between min_size and max_size
-        min_bp, max_bp = min(all_bp_counts), max(all_bp_counts)
-        all_bp_counts = [min_size + (count - min_bp) * (max_size - min_size) / (max_bp - min_bp) 
-                        for count in all_bp_counts]
+        # Scale BP counts to circle sizes (diameter)
+        bp_range = max_bp - min_bp
+        size_range = max_size - min_size
+        all_bp_sizes = [min_size + (count - min_bp) * (size_range / bp_range) 
+                       for count in all_bp_counts]
+    
+    print("Circle sizes (diameter):", [f"{s:.1f}" for s in all_bp_sizes])
+    print()
     
     # Distribute nodes in a circle
     n_nodes = len(data)
