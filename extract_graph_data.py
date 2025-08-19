@@ -16,19 +16,18 @@ def extract_graph_data(model_name="example"):
     np.save('A.npy', causal_graph)
     print(f"Saved causal graph adjacency matrix to A.npy with shape {causal_graph.shape}")
 
-    # Load GO term to biological process mappings
-    # This file should contain the actual biological process terms for each GO term
-    go_bp_df = pd.read_csv('data/go_biological_processes.csv')  # You'll need to create this file
+    # Load GO term to gene mappings from your existing data
+    go_gene_df = pd.read_csv('data/go_kegg_gene_map.tsv', sep='\t')
     
-    # If the above file doesn't exist, we can try to extract BP names from the GO term descriptions
-    # For now, let's assume we have a mapping of GO terms to their biological process names
-    try:
-        go_bp_mapping = go_bp_df.groupby('go_id')['biological_process'].apply(list).to_dict()
-    except:
-        # Fallback: create a simple mapping with GO term IDs as process names
-        all_gos = go_bp_df['PathwayID'].unique() if 'PathwayID' in go_bp_df.columns else []
-        go_bp_mapping = {go: [f"biological process {go}"] for go in all_gos}
-
+    # Create mapping from GO terms to biological process descriptions
+    # We'll use the GO term itself as the biological process name for now
+    # In a real implementation, you'd map GO IDs to their actual descriptions
+    go_bp_mapping = {}
+    for go_term in go_gene_df['PathwayID'].unique():
+        # For demonstration, we'll use the GO term ID as the process name
+        # You should replace this with actual GO term descriptions from an ontology file
+        go_bp_mapping[go_term] = [f"GO biological process {go_term}"]
+    
     # Get GO terms from the model data (these are the latent factors)
     gos = data['fc1'].columns.tolist()  # GO terms from fc1 layer
     
