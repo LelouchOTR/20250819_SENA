@@ -65,25 +65,30 @@ def generate_circular_wordcloud(
     
     return wc.generate_from_text(text)
 
-def draw_curved_arrow(ax, start, end, color='#555555', width=1.0, alpha=0.8):
-    """Draw a curved arrow between two points with enhanced arrowhead"""
+def draw_curved_arrow(ax, start, end, color='#444444', width=1.0, alpha=0.9):
+    """Draw a curved arrow between two points with precise edge targeting"""
     # Calculate direction vector
-    dx = end[0] - start[0]
-    dy = end[1] - start[1]
+    direction = np.array(end) - np.array(start)
+    distance = np.linalg.norm(direction)
+    if distance == 0:
+        return
+        
+    # Normalize direction
+    direction = direction / distance
     
-    # Create arrow with more visible arrowhead
+    # Create arrow with precise targeting and smaller head
     arrow = FancyArrowPatch(
         start, 
         end,
         arrowstyle='-|>',
         color=color,
-        linewidth=width * 1.5,  # Slightly thicker line
+        linewidth=width * 1.2,  # Slightly thicker line
         alpha=alpha,
-        mutation_scale=25,  # Larger arrowhead
+        mutation_scale=15,  # Smaller arrowhead
         connectionstyle=f'arc3,rad={0.2}',
-        shrinkA=10,  # Reduced from 15
-        shrinkB=10,  # Reduced from 15
-        zorder=4  # Ensure arrows are above nodes but below labels
+        shrinkA=0,  # No shrinking at start
+        shrinkB=0,  # No shrinking at end - we'll handle this manually
+        zorder=4
     )
     ax.add_patch(arrow)
 
@@ -221,23 +226,23 @@ def create_visualization(
         if node in wordclouds:
             wc, wc_size = wordclouds[node]
             
-            # Add label at the top edge of the word cloud with reduced padding
-            label_y = y + (wc_size // 2) + 5  # Reduced from 15 to 5
+            # Add clear, prominent LF label above word cloud
+            label_y = y + (wc_size // 2) + 2  # Minimal spacing
             ax.text(x, label_y, 
-                   node_info['label'],  # Use the cleaned label
+                   f"LF {node_info['label']}",  # Explicit LF prefix
                    ha='center', 
                    va='bottom',
-                   fontsize=10,
+                   fontsize=12,  # Larger font
                    fontweight='bold',
                    color=node_info['color'],
                    bbox=dict(
                        facecolor='white',
-                       alpha=0.9,
+                       alpha=0.95,  # More opaque
                        edgecolor='none',
-                       boxstyle='round,pad=0.1',  # Reduced padding
-                       linewidth=0
+                       boxstyle='round,pad=0.05',  # Minimal padding
+                       linewidth=0.5
                    ),
-                   zorder=5)  # Above everything else
+                   zorder=5)
             img = wc.to_array()
             
             # Calculate zoom factor with better scaling for the available space
@@ -275,13 +280,15 @@ def create_visualization(
             if distance > 0:
                 direction = direction / distance
                 
-                # Get node radii
-                start_radius = node_positions[src][2]['radius']
-                end_radius = node_positions[tgt][2]['radius']
+                # Get node and word cloud info
+                src_info = node_positions[src][2]
+                tgt_info = node_positions[tgt][2]
                 
-                # Adjust start and end points to be on the circle edges
-                start = np.array(start) + direction * start_radius
-                end = np.array(end) - direction * end_radius
+                # Calculate edge points at word cloud boundaries
+                # Use word cloud size for more accurate edge targeting
+                wc_radius = wordclouds[tgt][1] // 2 if tgt in wordclouds else tgt_info['radius']
+                start = np.array(start) + direction * src_info['radius']
+                end = np.array(end) - direction * (wc_radius * 0.9)  # Stop at word cloud edge
                 
                 # Draw arrow with weight-based width
                 draw_curved_arrow(
