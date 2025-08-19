@@ -4,7 +4,7 @@ import pandas as pd
 import os
 
 def extract_graph_data(model_name="example"):
-    """Extract causal graph and BP mappings from model output."""
+    """Extract causal graph and BP mappings from model output for top latent factors."""
     
     # Load the activation scores pickle file
     folder_path = os.path.join('results', model_name)
@@ -26,10 +26,18 @@ def extract_graph_data(model_name="example"):
     # Get GO terms from the model data (these are the latent factors)
     gos = data['fc1'].columns.tolist()  # GO terms from fc1 layer
     
-    # Create BP mappings
+    # Calculate importance scores for each GO term (based on connections in causal graph)
+    go_importance = np.sum(np.abs(causal_graph), axis=0) + np.sum(np.abs(causal_graph), axis=1)
+    
+    # Select top K most important GO terms (latent factors)
+    top_k = 7  # Match the number of nodes in Figure 2
+    top_indices = np.argsort(go_importance)[::-1][:top_k]
+    top_gos = [gos[i] for i in top_indices]
+    
+    # Create BP mappings for top GO terms only
     bp_mappings = []
     
-    for i, go_term in enumerate(gos):
+    for i, go_term in enumerate(top_gos):
         # Get genes associated with this GO term
         genes_in_go = go_gene_df[go_gene_df['PathwayID'] == go_term]['Symbol'].tolist()
         
@@ -48,6 +56,7 @@ def extract_graph_data(model_name="example"):
             
         bp_mappings.append({
             'latent_factor': i,
+            'go_id': go_term,
             'bp_name': bp_description
         })
 
@@ -57,8 +66,8 @@ def extract_graph_data(model_name="example"):
     print("Saved BP mappings to bp_mappings.csv")
 
     # Also save the full GO to gene mapping for reference
-    print("\nSample GO term mappings:")
-    for i, go_term in enumerate(gos[:5]):
+    print("\nTop GO term mappings:")
+    for i, go_term in enumerate(top_gos):
         genes = go_gene_df[go_gene_df['PathwayID'] == go_term]['Symbol'].tolist()
         gene_names = [ensembl_to_gene_name.get(gene_id, gene_id) for gene_id in genes]
         print(f"Latent factor {i} ({go_term}): {gene_names[:3]}")
