@@ -29,7 +29,7 @@ def create_circular_mask(size: int) -> np.ndarray:
     center = size // 2
     radius = center - 1
     mask = (x - center) ** 2 + (y - center) ** 2 > radius ** 2
-    return mask
+    return mask.astype(int) * 255
 
 def generate_circular_wordcloud(
     text: str, 
@@ -66,16 +66,23 @@ def generate_circular_wordcloud(
     return wc.generate_from_text(text)
 
 def draw_curved_arrow(ax, start, end, color='gray', width=1.0, alpha=0.6):
-    """Draw a curved arrow between two points"""
+    """Draw a curved arrow between two points with arrowhead"""
+    # Calculate direction vector
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    
+    # Create arrow with arrowhead
     arrow = FancyArrowPatch(
-        start, end,
-        arrowstyle='->',
+        start, 
+        end,
+        arrowstyle='-|>',  # This adds an arrowhead
         color=color,
         linewidth=width,
         alpha=alpha,
+        mutation_scale=15,  # Controls the size of the arrowhead
         connectionstyle=f'arc3,rad={0.2}',
-        shrinkA=15,
-        shrinkB=15
+        shrinkA=15,  # Distance from start point to arrow start
+        shrinkB=15   # Distance from end point to arrow tip
     )
     ax.add_patch(arrow)
 
@@ -163,17 +170,20 @@ def create_visualization(
         else:
             wc_size = 375  # Default size if all BP counts are the same
             
-        # Generate word cloud with scaled size
-        text = ' '.join(terms[:20])  # Limit number of terms
+        # Generate word cloud with biological process names
+        # Join all terms with spaces and create a single string
+        text = ' '.join(terms)
         color = plt.cm.get_cmap('tab20')(i % 20)
+        
+        # Create a circular word cloud with biological process names
         wc = generate_circular_wordcloud(
             text,
-            size=wc_size,  # Dynamic size based on BP count
+            size=wc_size,
             color_func=get_single_color_func(mcolors.to_hex(color)),
             background_color='white',
-            max_words=50,
-            min_font_size=8,  # Adjust based on size
-            max_font_size=100  # Adjust based on size
+            max_words=20,  # Limit number of terms for better visibility
+            min_font_size=10,  # Increased minimum font size for better readability
+            max_font_size=min(120, wc_size // 8)  # Scale max font size with word cloud size
         )
         wordclouds[node] = (wc, wc_size)  # Store both wordcloud and its size
         
@@ -181,23 +191,25 @@ def create_visualization(
         circle_diameter = all_bp_sizes[i]
         circle_radius = circle_diameter / 2
         
-        # Create circle with the scaled size
+        # Create a perfect circle with the scaled size
         circle = Circle(
             (x, y), 
             radius=circle_radius,
-            facecolor=colors[i % len(colors)],  # Use facecolor instead of color
-            alpha=0.3,  # Slightly more visible
-            zorder=1,   # Lower zorder to be behind text and word clouds
+            facecolor=colors[i % len(colors)],
+            alpha=0.3,
+            zorder=1,
             linewidth=2,
-            edgecolor=colors[i % len(colors)]  # Border color
+            edgecolor=colors[i % len(colors)]
         )
         ax.add_patch(circle)
         
-        # Add BP count as text inside the circle (above the circle, below the word cloud)
-        ax.text(x, y, str(bp_count), 
+        # Add latent factor number in the center of the circle
+        ax.text(x, y, node,  # Use node name (latent factor number)
                 ha='center', va='center',
-                fontsize=10, fontweight='bold',
+                fontsize=max(10, int(circle_radius/3)),  # Scale font size with circle
+                fontweight='bold',
                 color='black',
+                zorder=3)  # Ensure text is above the circle
                 zorder=3)  # Above the circle, below the word cloud
         
         # Add node label
