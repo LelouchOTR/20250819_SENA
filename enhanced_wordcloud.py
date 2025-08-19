@@ -159,9 +159,26 @@ def create_visualization(
         wordclouds[node] = wc
         
         # Add node circle with size based on BP count
-        circle_size = all_bp_counts[i]
-        circle = Circle((x, y), circle_size/2, color=colors[i % len(colors)], alpha=0.2, zorder=1)
+        circle_diameter = all_bp_sizes[i]
+        circle_radius = circle_diameter / 2
+        
+        # Create circle with the scaled size
+        circle = Circle(
+            (x, y), 
+            radius=circle_radius,
+            color=colors[i % len(colors)], 
+            alpha=0.3,  # Slightly more visible
+            zorder=1,
+            linewidth=2,
+            edgecolor=colors[i % len(colors)]  # Add border with the same color
+        )
         ax.add_patch(circle)
+        
+        # Add BP count as text inside the circle
+        ax.text(x, y, str(bp_count), 
+                ha='center', va='center',
+                fontsize=10, fontweight='bold',
+                color='black')
         
         # Add node label
         ax.text(x, y-70, node, 
