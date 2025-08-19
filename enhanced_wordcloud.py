@@ -158,7 +158,7 @@ def create_visualization(
         )
         wordclouds[node] = wc
         
-        # Add node circle with size based on BP count
+        # Add node circle with size based on BP count (drawn first, behind everything)
         circle_diameter = all_bp_sizes[i]
         circle_radius = circle_diameter / 2
         
@@ -166,27 +166,44 @@ def create_visualization(
         circle = Circle(
             (x, y), 
             radius=circle_radius,
-            color=colors[i % len(colors)], 
+            facecolor=colors[i % len(colors)],  # Use facecolor instead of color
             alpha=0.3,  # Slightly more visible
-            zorder=1,
+            zorder=1,   # Lower zorder to be behind text and word clouds
             linewidth=2,
-            edgecolor=colors[i % len(colors)]  # Add border with the same color
+            edgecolor=colors[i % len(colors)]  # Border color
         )
         ax.add_patch(circle)
         
-        # Add BP count as text inside the circle
+        # Add BP count as text inside the circle (above the circle, below the word cloud)
         ax.text(x, y, str(bp_count), 
                 ha='center', va='center',
                 fontsize=10, fontweight='bold',
-                color='black')
+                color='black',
+                zorder=3)  # Above the circle, below the word cloud
         
         # Add node label
-        ax.text(x, y-70, node, 
-               ha='center', va='center',
+        ax.text(x, y - circle_radius - 20,  # Position above the circle
+               node, 
+               ha='center', va='bottom',
                fontsize=10, fontweight='bold',
-               bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'))
+               bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', boxstyle='round,pad=0.2'),
+               zorder=4)  # Above everything
     
-    # Draw connections with curved arrows
+    # Add word clouds with higher zorder to be on top of circles
+    for i, (node, (x, y)) in enumerate(node_positions.items()):
+        if node in wordclouds:
+            img = wordclouds[node].to_array()
+            imagebox = OffsetImage(img, zoom=0.4, resample=True)
+            ab = AnnotationBbox(
+                imagebox, 
+                (x, y),
+                frameon=False,
+                box_alignment=(0.5, 0.5),
+                zorder=2  # Above circles, below labels
+            )
+            ax.add_artist(ab)
+    
+    # Draw connections with curved arrows (on top of circles but under labels)
     for source, target, weight in connections:
         if source in node_positions and target in node_positions:
             # Skip self-loops
