@@ -157,9 +157,10 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
     ax.set_xlim(min(x_coords) - x_margin, max(x_coords) + x_margin)
     ax.set_ylim(min(y_coords) - y_margin, max(y_coords) + y_margin)
     
-    # Draw edges with improved styling
+    # Draw edges with improved styling - now ending at circle edges
     edge_weights = [abs(graph[u][v]['weight']) for u, v in graph.edges()]
     max_weight = max(edge_weights) if edge_weights else 1
+    node_size = 0.25  # Consistent with node size used later
     
     for edge in graph.edges(data=True):
         src, dst, data = edge
@@ -167,16 +168,34 @@ def assemble_final_plot(graph: nx.DiGraph, go_mappings: dict, wordcloud_dir: str
         dst_pos = pos[dst]
         weight = abs(data['weight'])
         
-        # Better scaling for visibility
-        linewidth = 1 + (weight / max_weight) * 8
-        alpha = 0.3 + (weight / max_weight) * 0.7
+        # Calculate direction vector
+        dx = dst_pos[0] - src_pos[0]
+        dy = dst_pos[1] - src_pos[1]
+        distance = np.sqrt(dx**2 + dy**2)
+        
+        # Normalize direction vector
+        if distance > 0:
+            dx /= distance
+            dy /= distance
+            
+            # Calculate where arrow should start and end (at circle edges)
+            src_edge = (src_pos[0] + dx * node_size, src_pos[1] + dy * node_size)
+            dst_edge = (dst_pos[0] - dx * node_size, dst_pos[1] - dy * node_size)
+        else:
+            # Fallback if positions are the same
+            src_edge = src_pos
+            dst_edge = dst_pos
+        
+        # Better scaling for visibility with reduced thickness
+        linewidth = 0.5 + (weight / max_weight) * 3  # Reduced from previous values
+        alpha = 0.4 + (weight / max_weight) * 0.6    # Slightly increased minimum alpha
         
         ax.annotate(
             '',
-            xy=dst_pos,
-            xytext=src_pos,
+            xy=dst_edge,
+            xytext=src_edge,
             arrowprops=dict(
-                arrowstyle='->,head_width=0.4,head_length=0.6',
+                arrowstyle='->,head_width=0.3,head_length=0.4',  # Smaller arrowhead
                 lw=linewidth,
                 color='black',
                 alpha=alpha,
