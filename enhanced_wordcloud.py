@@ -175,6 +175,10 @@ def create_visualization(
     ax.set_ylim(0, size)
     ax.axis('off')
     
+    # Set font properties for better readability
+    plt.rcParams['font.family'] = 'Arial, DejaVu Sans, sans-serif'
+    plt.rcParams['font.weight'] = 'normal'
+    
     log_memory_usage("After creating figure")
     
     # Start memory tracking
@@ -434,10 +438,9 @@ def create_visualization(
         
         # Add latent factor label with colored background
         lf_label = f"LF {lf}"
-        # Only label as "Other" if it's specifically the "unassigned" category (LF 0)
-        # But still show it as "LF 0" for clarity
+        # Label LF 0 as "Unassigned"
         if lf == 0:
-            lf_label = "LF 0 (Unassigned)"
+            lf_label = "Unassigned"
         
         # Add label
         ax.text(
@@ -447,7 +450,8 @@ def create_visualization(
             ha='center', 
             va='top', 
             fontsize=14,
-            fontweight='bold',
+            fontweight='normal',
+            fontfamily='Arial',
             bbox=dict(
                 facecolor=colors(i), 
                 alpha=0.8, 
@@ -465,8 +469,12 @@ def create_visualization(
     ax.set_yticks([])
     ax.set_aspect('equal')
     
-    # Add title
-    plt.title('Biological Processes by Latent Factor', fontsize=18, pad=20, fontweight='bold')
+    # Add title with improved font
+    plt.title('Biological Processes by Latent Factor', 
+              fontsize=18, 
+              pad=20, 
+              fontweight='normal',
+              fontfamily='Arial')
     
     # Add legend for latent factors
     legend_elements = [
@@ -486,7 +494,8 @@ def create_visualization(
         bbox_to_anchor=(0.5, -0.05),
         ncol=min(5, len(legend_elements)),
         frameon=False,
-        fontsize=10
+        fontsize=10,
+        prop={'family': 'Arial'}
     )
     
     # Save the figure with optimized settings
