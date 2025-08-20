@@ -11,6 +11,7 @@ import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend to save memory
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import matplotlib.patheffects as patheffects
 import numpy as np
 from wordcloud import WordCloud
 
@@ -357,11 +358,15 @@ def create_visualization(
             interpolation='bilinear'
         )
         
-        # Add a subtle circular border
+        # Add a subtle circular border that matches the word cloud mask
         circle = plt.Circle((x, y), wc_width/2 * 0.95,  # Slightly smaller than word cloud
-                          fill=False, color='#2C3E50',  # Darker border
-                          alpha=0.8, linewidth=2, zorder=3,  # Thicker border
-                          linestyle='-')
+                          fill=False, 
+                          color='#2C3E50',  # Darker border
+                          alpha=0.8, 
+                          linewidth=1.5,  # Slightly thinner border
+                          zorder=3,
+                          linestyle='-',
+                          path_effects=[patheffects.withStroke(linewidth=3, foreground='white', alpha=0.7)])
         ax.add_patch(circle)
         
         # Add latent factor label with colored background
