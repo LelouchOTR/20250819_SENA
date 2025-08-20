@@ -425,8 +425,9 @@ def create_visualization(
                     arrowstyle='-|>',  # Solid arrowhead
                     connectionstyle=f'arc3,rad={0.2 if weight > 0.5 else 0.1}'  # More curve for stronger interactions
                 )
-    
-    
+            except Exception as e:
+                print(f"Error processing connection {i} ({conn}): {str(e)}")
+                continue
     
     # Configure plot with biological context
     ax.set_xlim(0, size)
