@@ -23,10 +23,19 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 def load_go_data() -> Tuple[GODag, Dict, Dict]:
     """Load GO data and gene to GO term mappings."""
-    # Check for GO data files
-    obo_file = "data/go-basic.obo"
+    # Define file paths
+    data_dir = Path("data")
+    go_obo_file = data_dir / "go-basic.obo"
+    gene2go_file = data_dir / "gene2go"
+    
+    # Check if files exist
+    if not go_obo_file.exists():
+        raise FileNotFoundError(f"GO OBO file not found at {go_obo_file}. Please run download_go_data.py first.")
+    if not gene2go_file.exists():
+        raise FileNotFoundError(f"gene2go file not found at {gene2go_file}. Please run download_go_data.py first.")
+    
     print("Loading GO data...")
-    godag = GODag(go_obo_file)
+    godag = GODag(str(go_obo_file))
     
     print("Loading gene to GO mappings...")
     gene2go = read_ncbi_gene2go(gene2go_file, namespaces=['BP'], go2geneids=True)
