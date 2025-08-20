@@ -68,6 +68,26 @@ def get_bp_terms(godag: GODag) -> List[str]:
     return [go_id for go_id, term in godag.items() 
             if term.namespace == 'biological_process']
 
+def process_bp_name(name: str) -> str:
+    """Process biological process name for better readability in word cloud."""
+    # Remove common prefixes
+    name = re.sub(r'^[a-z\s]*regulation of\s*', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'^[a-z\s]*positive regulation of\s*', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'^[a-z\s]*negative regulation of\s*', '', name, flags=re.IGNORECASE)
+    
+    # Remove anything in parentheses and brackets
+    name = re.sub(r'\s*\([^)]*\)', '', name)
+    name = re.sub(r'\s*\[[^]]*\]', '', name)
+    
+    # Remove GO:XXXXXX IDs
+    name = re.sub(r'GO:\d+', '', name)
+    
+    # Clean up and title case
+    name = ' '.join(word for word in name.split() if word.lower() not in {'of', 'in', 'to', 'by', 'for'})
+    name = name.strip().title()
+    
+    return name
+
 def get_gene_to_go(gene2go: Dict) -> Dict[str, List[str]]:
     """Convert gene2go to gene_id -> list of GO terms mapping."""
     gene_to_go = defaultdict(list)
