@@ -4,5 +4,5 @@ This document describes the step-by-step process to generate enhanced wordcloud 
 
 ## Workflow Steps
 
-### 1. Download Gene Ontology Data
-First, you need to download the required GO data files:
+### 1. Generate Activation Scores
+First, you need to generate activation scores from your trained model:
