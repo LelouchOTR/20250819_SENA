@@ -40,7 +40,7 @@ class MockModel:
     def __init__(self, state_dict, config):
         self.state_dict_content = state_dict
         self.config = config
-        # Try to find a square matrix that might represent the causal graph
+        # Try to find a square matrix in the state dict that represents the causal graph
         self.G = self._find_causal_graph()
         
     def _find_causal_graph(self):
@@ -64,7 +64,8 @@ def generating_data(config_file, fpath, batch_size=32):
     """Generate activation scores using config file approach"""
     
     ## detect device
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    logging.info(f"Using device: {device}")
 
     # define parameters
     dataset_name = config_file["dataset_name"]
@@ -129,7 +130,6 @@ def generating_data(config_file, fpath, batch_size=32):
 
     """compute"""
     with torch.no_grad():
-
         for gene in tqdm(idx_dict, desc='generating activity score for perturbations'):
             
             idx = idx_dict[gene]
@@ -142,7 +142,7 @@ def generating_data(config_file, fpath, batch_size=32):
                 first_layer_weight = None
                 for key, value in model.state_dict_content.items():
                     if 'encoder.network.0.weight' in key:
-                        first_layer_weight = value
+                        first_layer_weight = value.to(device).double()
                         break
                 
                 if first_layer_weight is not None:
@@ -151,7 +151,7 @@ def generating_data(config_file, fpath, batch_size=32):
                     info_dict['fc1'][gene].append(na_score_fc1.detach().cpu().numpy())
                 else:
                     # If no encoder layer found, create dummy scores
-                    na_score_fc1 = torch.zeros((mat.shape[0], 1024))  # Assuming 1024 latent dims
+                    na_score_fc1 = torch.zeros((mat.shape[0], 1024), device=device).double()  # Assuming 1024 latent dims
                     info_dict['fc1'][gene].append(na_score_fc1.detach().cpu().numpy())
             else:
                 # For regular model
@@ -160,7 +160,7 @@ def generating_data(config_file, fpath, batch_size=32):
                     info_dict['fc1'][gene].append(na_score_fc1.detach().cpu().numpy())
                 except:
                     # If fc1 doesn't exist, create dummy scores
-                    na_score_fc1 = torch.zeros((mat.shape[0], 1024))  # Assuming 1024 latent dims
+                    na_score_fc1 = torch.zeros((mat.shape[0], 1024), device=device).double()  # Assuming 1024 latent dims
                     info_dict['fc1'][gene].append(na_score_fc1.detach().cpu().numpy())
 
             """mean + var"""
@@ -170,16 +170,16 @@ def generating_data(config_file, fpath, batch_size=32):
                 var_layer_weight = None
                 for key, value in model.state_dict_content.items():
                     if 'encoder.network.12.weight' in key:  # Last encoder layer
-                        mean_layer_weight = value
+                        mean_layer_weight = value.to(device).double()
                     elif 'fc_var' in key and 'weight' in key:
-                        var_layer_weight = value
+                        var_layer_weight = value.to(device).double()
                 
                 if mean_layer_weight is not None:
                     na_score_fc_mean = torch.matmul(na_score_fc1, mean_layer_weight.T)
                     info_dict['fc_mean'][gene].append(na_score_fc_mean.detach().cpu().numpy())
                 else:
                     # Create dummy mean scores
-                    na_score_fc_mean = torch.zeros((na_score_fc1.shape[0], 256))  # Assuming 256 latent dims
+                    na_score_fc_mean = torch.zeros((na_score_fc1.shape[0], 256), device=device).double()  # Assuming 256 latent dims
                     info_dict['fc_mean'][gene].append(na_score_fc_mean.detach().cpu().numpy())
                 
                 if var_layer_weight is not None:
@@ -187,7 +187,7 @@ def generating_data(config_file, fpath, batch_size=32):
                     info_dict['fc_var'][gene].append(na_score_fc_var.detach().cpu().numpy())
                 else:
                     # Create dummy var scores
-                    na_score_fc_var = torch.ones((na_score_fc1.shape[0], 256))  # Assuming 256 latent dims
+                    na_score_fc_var = torch.ones((na_score_fc1.shape[0], 256), device=device).double()  # Assuming 256 latent dims
                     info_dict['fc_var'][gene].append(na_score_fc_var.detach().cpu().numpy())
             else:
                 try:
@@ -195,7 +195,7 @@ def generating_data(config_file, fpath, batch_size=32):
                     info_dict['fc_mean'][gene].append(na_score_fc_mean.detach().cpu().numpy())
                 except:
                     # Create dummy mean scores
-                    na_score_fc_mean = torch.zeros((na_score_fc1.shape[0], 256))  # Assuming 256 latent dims
+                    na_score_fc_mean = torch.zeros((na_score_fc1.shape[0], 256), device=device).double()  # Assuming 256 latent dims
                     info_dict['fc_mean'][gene].append(na_score_fc_mean.detach().cpu().numpy())
                 
                 try:
@@ -203,7 +203,7 @@ def generating_data(config_file, fpath, batch_size=32):
                     info_dict['fc_var'][gene].append(na_score_fc_var.detach().cpu().numpy())
                 except:
                     # Create dummy var scores
-                    na_score_fc_var = torch.ones((na_score_fc1.shape[0], 256))  # Assuming 256 latent dims
+                    na_score_fc_var = torch.ones((na_score_fc1.shape[0], 256), device=device).double()  # Assuming 256 latent dims
                     info_dict['fc_var'][gene].append(na_score_fc_var.detach().cpu().numpy())
 
             """reparametrization trick"""
@@ -346,7 +346,8 @@ def generating_data_from_model_path(model_path, batch_size=32):
     results_dict = {}
 
     """compute"""
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    logging.info(f"Using device: {device}")
     
     with torch.no_grad():
         for gene in tqdm(idx_dict, desc='generating activity score for perturbations'):
@@ -360,7 +361,7 @@ def generating_data_from_model_path(model_path, batch_size=32):
                 first_layer_weight = None
                 for key, value in model.state_dict_content.items():
                     if 'encoder.network.0.weight' in key:
-                        first_layer_weight = value
+                        first_layer_weight = value.to(device).double()
                         break
                 
                 if first_layer_weight is not None:
@@ -369,7 +370,7 @@ def generating_data_from_model_path(model_path, batch_size=32):
                     info_dict['fc1'][gene].append(na_score_fc1.detach().cpu().numpy())
                 else:
                     # If no encoder layer found, create dummy scores
-                    na_score_fc1 = torch.zeros((mat.shape[0], 1024))  # Assuming 1024 latent dims
+                    na_score_fc1 = torch.zeros((mat.shape[0], 1024), device=device).double()  # Assuming 1024 latent dims
                     info_dict['fc1'][gene].append(na_score_fc1.detach().cpu().numpy())
             else:
                 # For regular model
@@ -378,7 +379,7 @@ def generating_data_from_model_path(model_path, batch_size=32):
                     info_dict['fc1'][gene].append(na_score_fc1.detach().cpu().numpy())
                 except:
                     # If fc1 doesn't exist, create dummy scores
-                    na_score_fc1 = torch.zeros((mat.shape[0], 1024))  # Assuming 1024 latent dims
+                    na_score_fc1 = torch.zeros((mat.shape[0], 1024), device=device).double()  # Assuming 1024 latent dims
                     info_dict['fc1'][gene].append(na_score_fc1.detach().cpu().numpy())
 
             """mean + var"""
@@ -388,16 +389,16 @@ def generating_data_from_model_path(model_path, batch_size=32):
                 var_layer_weight = None
                 for key, value in model.state_dict_content.items():
                     if 'encoder.network.12.weight' in key:  # Last encoder layer
-                        mean_layer_weight = value
+                        mean_layer_weight = value.to(device).double()
                     elif 'fc_var' in key and 'weight' in key:
-                        var_layer_weight = value
+                        var_layer_weight = value.to(device).double()
                 
                 if mean_layer_weight is not None:
                     na_score_fc_mean = torch.matmul(na_score_fc1, mean_layer_weight.T)
                     info_dict['fc_mean'][gene].append(na_score_fc_mean.detach().cpu().numpy())
                 else:
                     # Create dummy mean scores
-                    na_score_fc_mean = torch.zeros((na_score_fc1.shape[0], 256))  # Assuming 256 latent dims
+                    na_score_fc_mean = torch.zeros((na_score_fc1.shape[0], 256), device=device).double()  # Assuming 256 latent dims
                     info_dict['fc_mean'][gene].append(na_score_fc_mean.detach().cpu().numpy())
                 
                 if var_layer_weight is not None:
@@ -405,7 +406,7 @@ def generating_data_from_model_path(model_path, batch_size=32):
                     info_dict['fc_var'][gene].append(na_score_fc_var.detach().cpu().numpy())
                 else:
                     # Create dummy var scores
-                    na_score_fc_var = torch.ones((na_score_fc1.shape[0], 256))  # Assuming 256 latent dims
+                    na_score_fc_var = torch.ones((na_score_fc1.shape[0], 256), device=device).double()  # Assuming 256 latent dims
                     info_dict['fc_var'][gene].append(na_score_fc_var.detach().cpu().numpy())
             else:
                 try:
@@ -413,7 +414,7 @@ def generating_data_from_model_path(model_path, batch_size=32):
                     info_dict['fc_mean'][gene].append(na_score_fc_mean.detach().cpu().numpy())
                 except:
                     # Create dummy mean scores
-                    na_score_fc_mean = torch.zeros((na_score_fc1.shape[0], 256))  # Assuming 256 latent dims
+                    na_score_fc_mean = torch.zeros((na_score_fc1.shape[0], 256), device=device).double()  # Assuming 256 latent dims
                     info_dict['fc_mean'][gene].append(na_score_fc_mean.detach().cpu().numpy())
                 
                 try:
@@ -421,7 +422,7 @@ def generating_data_from_model_path(model_path, batch_size=32):
                     info_dict['fc_var'][gene].append(na_score_fc_var.detach().cpu().numpy())
                 except:
                     # Create dummy var scores
-                    na_score_fc_var = torch.ones((na_score_fc1.shape[0], 256))  # Assuming 256 latent dims
+                    na_score_fc_var = torch.ones((na_score_fc1.shape[0], 256), device=device).double()  # Assuming 256 latent dims
                     info_dict['fc_var'][gene].append(na_score_fc_var.detach().cpu().numpy())
 
             """reparametrization trick"""
