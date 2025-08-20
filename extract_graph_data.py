@@ -73,7 +73,10 @@ def extract_graph_data(model_name: str = "example") -> None:
     # Extract and save the causal graph adjacency matrix
     causal_graph = data['causal_graph']
     np.save('A.npy', causal_graph)
-    print(f"Saved causal graph adjacency matrix to A.npy with shape {causal_graph.shape}")
+    print(f"Causal graph shape: {causal_graph.shape}")
+    print(f"Number of nodes: {causal_graph.shape[0]}")
+    print(f"Sparse density: {(np.abs(causal_graph) > 0.1).mean()*100:.2f}% of values > 0.1")
+    print(f"Saved causal graph adjacency matrix to A.npy")
 
     # Load Norman2019 dataset
     norman_path = Path('datasets') / 'Norman2019_raw.h5ad'
@@ -248,10 +251,37 @@ def save_visualization_data(nodes, connections, output_dir='output'):
 def extract_graph_data(model_name="example"):
     """Extract causal graph and BP mappings from model output for top latent factors."""
     
-    # Load the activation scores pickle file
-    folder_path = os.path.join('results', model_name)
-    with open(os.path.join(folder_path, 'activation_scores.pickle'), 'rb') as f:
-        data = pickle.load(f)
+    # Load the pretrained model
+    if not os.path.exists(model_name):
+        raise FileNotFoundError(f"Model file not found: {model_name}")
+    
+    # Check if it's a .pt file (PyTorch model)
+    if model_name.endswith('.pt'):
+        import torch
+        print(f"Loading PyTorch model from {model_name}")
+        model = torch.load(model_name, map_location=torch.device('cpu'))
+        
+        # Extract the causal graph from the model
+        # Note: Adjust these attribute names based on the actual model structure
+        if hasattr(model, 'causal_graph'):
+            causal_graph = model.causal_graph.detach().numpy()
+        elif hasattr(model, 'A'):  # Some models use 'A' for the adjacency matrix
+            causal_graph = model.A.detach().numpy()
+        else:
+            # Try to find the first parameter that looks like a graph
+            for name, param in model.named_parameters():
+                if param.dim() == 2 and param.size(0) == param.size(1):
+                    causal_graph = param.detach().numpy()
+                    print(f"Found graph parameter: {name}")
+                    break
+            else:
+                raise ValueError("Could not find causal graph in the model")
+        
+        # Create a mock data dictionary with the causal graph
+        data = {
+            'causal_graph': causal_graph,
+            'fc1': type('', (), {'columns': [f'GO:{i:07d}' for i in range(causal_graph.shape[0])]})()
+        }
 
     # Extract the causal graph adjacency matrix
     causal_graph = data['causal_graph']
