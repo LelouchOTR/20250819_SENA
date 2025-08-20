@@ -33,6 +33,28 @@ def main():
             for key in model.state_dict().keys():
                 print(f"- {key}")
         
+        # If model is a tuple, examine its elements
+        elif isinstance(model, tuple):
+            print(f"\nModel is a tuple with {len(model)} elements")
+            for i, item in enumerate(model):
+                print(f"\nElement {i} type: {type(item)}")
+                if hasattr(item, '__dict__'):
+                    print(f"Element {i} attributes: {[a for a in dir(item) if not a.startswith('_')]}")
+                elif hasattr(item, 'keys'):
+                    print(f"Element {i} keys: {list(item.keys())}")
+                
+                # Try to find something that looks like a causal graph
+                if hasattr(item, 'causal_graph'):
+                    print("\nFound causal_graph attribute!")
+                    print(f"causal_graph shape: {item.causal_graph.shape if hasattr(item.causal_graph, 'shape') else 'N/A'}")
+                
+                # Look for any 2D tensors that might be a graph
+                if hasattr(item, 'state_dict'):
+                    print("\nState dict keys:")
+                    for key, value in item.state_dict().items():
+                        if hasattr(value, 'shape'):
+                            print(f"- {key}: {value.shape}")
+        
         # If model is a dictionary, show its keys
         elif isinstance(model, dict):
             print("\nModel dictionary keys:")
