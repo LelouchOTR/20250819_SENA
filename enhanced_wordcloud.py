@@ -198,22 +198,35 @@ def create_visualization(
         }
         node_positions[node] = (x, y, node_info)
         
-        # Create a custom color function using the node's color
-        def color_func(word, **kwargs):
-            return node_color
-            
-        # Generate word cloud with consistent coloring
+        # Generate word cloud with default coloring
         wc = generate_circular_wordcloud(
             ' '.join(terms),
             size=wc_size,
-            color_func=color_func,
             max_words=100,
             min_font_size=8,
             max_font_size=min(100, wc_size // 8),
             background_color='white',
             contour_width=1.5,
-            contour_color=node_color
+            colormap='tab20'  # Use a colormap that provides good color variety
         )
+        
+        # Get the most frequent color from the word cloud (excluding background)
+        wc_array = wc.to_array()
+        # Flatten the array and remove white background pixels
+        pixels = wc_array.reshape(-1, 3)
+        pixels = pixels[~np.all(pixels == 255, axis=1)]  # Remove white pixels
+        if len(pixels) > 0:
+            # Find the most common color
+            unique_colors, counts = np.unique(pixels, axis=0, return_counts=True)
+            dominant_color = unique_colors[np.argmax(counts)]
+            # Convert to hex
+            node_color = '#%02x%02x%02x' % tuple(dominant_color)
+        else:
+            # Fallback to default color if no colors found
+            node_color = '#1f77b4'
+            
+        # Update node info with the extracted color
+        node_info['color'] = node_color
         wordclouds[node] = (wc, wc_size)  # Store both wordcloud and its size
         
         # Add node circle with size based on BP count (drawn first, behind everything)
@@ -283,13 +296,14 @@ def create_visualization(
             )
             ax.add_artist(ab)
     
-    # Create a legend showing LF numbers with their colors
+    # Create a legend showing LF numbers with their word cloud's dominant color
     legend_elements = []
     for node, (x, y, node_info) in sorted(node_positions.items(), 
                                         key=lambda x: int(x[1][2]['label'])):
-        legend_elements.append(patches.Patch(facecolor=node_info['color'],
-                                          edgecolor='none',
-                                          label=f"LF {node_info['label']}"))
+        if node in wordclouds:
+            legend_elements.append(patches.Patch(facecolor=node_info['color'],
+                                              edgecolor='none',
+                                              label=f"LF {node_info['label']}"))
     
     # Add legend to the plot
     legend = ax.legend(handles=legend_elements, 
