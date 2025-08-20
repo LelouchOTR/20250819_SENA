@@ -6,7 +6,7 @@ from wordcloud import WordCloud, get_single_color_func
 import matplotlib.patches as patches
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import matplotlib.colors as mcolors
-from matplotlib.patches import FancyArrowPatch, Circle
+from matplotlib.patches import FancyArrowPatch, Circle, patches
 import matplotlib.image as mpimg
 from pathlib import Path
 import random
@@ -262,6 +262,33 @@ def create_visualization(
                 zorder=2  # Above circles, below labels
             )
             ax.add_artist(ab)
+    
+    # Create a legend showing LF numbers with their colors
+    legend_elements = []
+    for node, (x, y, node_info) in sorted(node_positions.items(), 
+                                        key=lambda x: int(x[1][2]['label'])):
+        legend_elements.append(patches.Patch(facecolor=node_info['color'],
+                                          edgecolor='none',
+                                          label=f"LF {node_info['label']}"))
+    
+    # Add legend to the plot
+    legend = ax.legend(handles=legend_elements, 
+                      loc='upper right', 
+                      bbox_to_anchor=(0.98, 0.98),
+                      frameon=True,
+                      framealpha=0.9,
+                      edgecolor='#DDDDDD',
+                      title='Latent Factors',
+                      title_fontsize=12,
+                      fontsize=11,
+                      borderpad=0.8,
+                      handlelength=1.5,
+                      handleheight=1.5,
+                      handletextpad=0.5,
+                      borderaxespad=0.8)
+    
+    # Make legend frame slightly rounded
+    legend.get_frame().set_boxstyle('round', pad=0.2, rounding_size=0.5)
     
     # Draw connections between nodes with arrowheads
     for src, tgt, weight in connections:
