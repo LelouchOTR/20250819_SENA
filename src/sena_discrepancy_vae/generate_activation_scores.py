@@ -241,12 +241,50 @@ def generating_data_from_model_path(model_path, batch_size=32):
     logging.info(f"First few targets: {ptb_targets[:5]}")
     logging.info(f"First few GO terms: {gos[:5] if gos else 'None'}")
     
-    # Handle model data (could be model object or tuple)
+    # Handle model data (could be model object, state dict, or tuple)
     if isinstance(model_data, tuple):
-        model = model_data[0]  # Assume first element is the model
-        logging.info("Model data is a tuple, using first element")
+        logging.info("Model data is a tuple")
+        if len(model_data) > 0:
+            model_content = model_data[0]  # Assume first element is the model or state dict
+            logging.info(f"First element type: {type(model_content)}")
+        else:
+            raise ValueError("Model tuple is empty")
     else:
-        model = model_data
+        model_content = model_data
+    
+    # Initialize model
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    logging.info(f"Using device: {device}")
+    
+    # Check if model_content is a state dict or model object
+    if isinstance(model_content, dict):
+        # This is a state dict, we need to create a model instance and load the state dict
+        logging.info("Model content is a state dict, creating model instance...")
+        
+        # Create model with default parameters (you might need to adjust these based on your model)
+        model = CMVAE(
+            dim=adata.shape[1],  # input dimension
+            z_dim=5,  # latent dimension - you might need to determine this from the state dict
+            c_dim=len(ptb_targets),  # perturbation dimension
+            device=device,
+            mode="mlp",
+            gos=gos,
+            rel_dict=None,  # You might need to provide this if required
+            sena_lambda=0.0  # You might need to adjust this
+        )
+        
+        # Load state dict into model
+        model.load_state_dict(model_content)
+        logging.info("State dict loaded into model")
+    else:
+        # Assume this is already a model object
+        model = model_content
+        logging.info("Model content is a model object")
+    
+    # Move model to device if it has the to() method
+    if hasattr(model, 'to'):
+        model = model.to(device)
+        logging.info("Model moved to device")
     
     # Debug: print model structure
     logging.info(f"Model type: {type(model)}")
@@ -254,9 +292,6 @@ def generating_data_from_model_path(model_path, batch_size=32):
         logging.info(f"Model attributes: {list(vars(model).keys())}")
     if hasattr(model, 'G'):
         logging.info(f"Causal graph G shape: {model.G.shape if model.G is not None else 'None'}")
-    
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    model = model.to(device)
     
     # Build pert idx dict
     idx_dict = {}
