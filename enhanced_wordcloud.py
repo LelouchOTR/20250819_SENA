@@ -283,8 +283,8 @@ def create_visualization(
         wc_width = wc_size
         wc_height = wc_size * wc_ratio
         
-        # Store position for arrow connections
-        lf_positions[lf] = (x, y, wc_width/2)
+        # Store position for arrow connections (x, y, radius)
+        lf_positions[str(lf)] = (x, y, wc_width/2)
         
         # Add word cloud to plot
         ax.imshow(
@@ -404,9 +404,7 @@ def create_visualization(
     plt.savefig(output_path, 
                dpi=dpi, 
                bbox_inches='tight', 
-               pad_inches=0.2,
-               optimize=True,
-               quality=85)  # Reduce quality to save memory
+               pad_inches=0.2)
     plt.close(fig)
     plt.close('all')
     
