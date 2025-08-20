@@ -16,7 +16,14 @@ pip install -r requirements.txt
 First, download the necessary data files:
 
 ```bash
+# Download GO data
 python download_go_data.py
+
+# Download and extract CPA binaries and Norman2019 dataset
+wget https://dl.fbaipublicfiles.com/dlp/cpa_binaries.tar
+tar -xvf cpa_binaries.tar
+cp Norman2019_raw.h5ad data/.
+rm cpa_binaries.tar
 ```
 
 ### 2. Generate Activation Scores
