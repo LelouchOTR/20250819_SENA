@@ -113,11 +113,12 @@ def create_visualization(
     fig, ax = plt.subplots(figsize=(size/100, size/100), dpi=dpi, facecolor='white')
     ax.set_facecolor('white')
     
-    # Generate distinct colors for nodes
+    # Generate distinct colors for word clouds
     colors = [
         '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
         '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
     ]
+    # LF labels will use dark gray for consistency
     
     # Generate word clouds and store their positions
     node_positions = {}
@@ -228,22 +229,15 @@ def create_visualization(
         if node in wordclouds:
             wc, wc_size = wordclouds[node]
             
-            # Add LF label directly above word cloud with minimal spacing
-            label_y = y + (wc_size // 2)  # Right at the top edge
+            # Add clean, minimal LF label above word cloud
+            label_y = y + (wc_size // 2) + 2  # Slight offset from edge
             ax.text(x, label_y, 
                    f"LF {node_info['label']}",
                    ha='center', 
                    va='bottom',
-                   fontsize=14,  # Larger, more prominent
+                   fontsize=16,  # Larger for better visibility
                    fontweight='bold',
-                   color=node_info['color'],  # Match node color
-                   bbox=dict(
-                       facecolor='white',
-                       alpha=0.98,  # More opaque
-                       edgecolor=node_info['color'],  # Colored border matching word cloud
-                       boxstyle='round,pad=0.02',  # Minimal padding
-                       linewidth=1
-                   ),
+                   color='#333333',  # Dark gray for better contrast
                    zorder=5)
             img = wc.to_array()
             
