@@ -466,6 +466,10 @@ def main():
                        help='Output file path for the visualization')
     parser.add_argument('--data-dir', type=str, default='visualization_output',
                        help='Directory containing visualization data (fallback if bp_scores not provided)')
+    parser.add_argument('--size', type=int, default=800,
+                       help='Size of the output image (width=height)')
+    parser.add_argument('--dpi', type=int, default=300,
+                       help='DPI of the output image')
     
     args = parser.parse_args()
     
