@@ -14,6 +14,8 @@ import matplotlib.colors as mcolors
 import matplotlib.patheffects as patheffects
 import numpy as np
 from wordcloud import WordCloud
+import networkx as nx
+
 
 def log_memory_usage(label: str = ''):
     """Log current memory usage"""
@@ -50,69 +52,22 @@ def create_circular_mask(size: int) -> np.ndarray:
     """Create a circular mask for the word cloud
     
     Returns:
-        np.ndarray: A 2D array where white (255) areas are masked out (no words)
-        and black (0) areas are where words can be placed.
+        np.ndarray: A 2D array where 255 (white) areas are masked out (no words)
+        and 0 (black) areas are where words can be placed.
     """
     x, y = np.ogrid[:size, :size]
     center = size // 2
     radius = center - 1
-    # Create a circular mask where True is outside the circle
-    # Then invert it (1 - mask) so inside is 0 (black, where words go)
-    # and outside is 1 (white, masked out)
-    mask = ((x - center) ** 2 + (y - center) ** 2 <= radius ** 2).astype(int)
-    # Invert to make circle black (0) and background white (255)
-    return (1 - mask) * 255
-
-
-def generate_circular_wordcloud(
-        text: str,
-        size: int = 800,
-        background_color: str = 'white',
-        colormap: str = 'tab20',
-        max_words: int = 100,
-        contour_width: float = 1.0,
-        contour_color: str = 'steelblue',
-        color_func=None,
-        min_font_size: int = 8,
-        max_font_size: int = 100,
-        font_path: str = None,
-        frequencies: dict = None
-):
-    """Generate a circular word cloud with custom styling"""
-    # Generate the circular mask
-    mask = create_circular_mask(size)
-
-    # Create the word cloud
-    wc = CustomWordCloud(
-        width=size,
-        height=size,
-        background_color=background_color,
-        mask=mask,
-        max_words=max_words,
-        contour_width=contour_width,
-        contour_color=contour_color,
-        color_func=color_func,
-        min_font_size=min_font_size,
-        max_font_size=max_font_size,
-        font_path=font_path,
-        colormap=colormap,
-        prefer_horizontal=1.0,
-        relative_scaling=0.5,
-        random_state=42,
-        margin=0,  # No margin for tighter packing
-        normalize_plurals=False
-    )
-
-    if frequencies:
-        return wc.generate_from_frequencies(frequencies)
-    elif text:
-        return wc.generate_from_text(text)
-    else:
-        raise ValueError("Either text or frequencies must be provided")
+    # Create mask where True means inside the circle (valid placement area)
+    # Convert to uint8 and invert: 0 for valid areas, 255 for masked areas
+    mask = ((x - center) ** 2 + (y - center) ** 2 > radius ** 2).astype(np.uint8) * 255
+    return mask
 
 
 def draw_curved_arrow(ax, start, end, color='#444444', width=1.0, alpha=0.9):
     """Draw a curved arrow between two points with precise edge targeting"""
+    from matplotlib.patches import FancyArrowPatch
+    
     # Calculate direction vector
     direction = np.array(end) - np.array(start)
     distance = np.linalg.norm(direction)
@@ -138,57 +93,6 @@ def draw_curved_arrow(ax, start, end, color='#444444', width=1.0, alpha=0.9):
     )
     ax.add_patch(arrow)
 
-
-def create_wordcloud_for_latent_factor(bps, lf, size, min_font_size, max_font_size, color):
-    """Create a single word cloud for a latent factor"""
-    log_memory_usage(f"Creating word cloud for LF {lf}")
-    
-    # Combine all BPs for this latent factor into a single word cloud
-    frequencies = {}
-    for bp_name, score in bps:
-        # Split BP name into words and add each word with the score
-        for word in bp_name.split():
-            # Remove any non-alphanumeric characters from the word
-            word = ''.join(c.lower() for c in word if c.isalnum())
-            if word and len(word) > 2:  # Only add non-empty words with length > 2
-                frequencies[word] = frequencies.get(word, 0) + score
-    
-    if not frequencies:
-        print(f"No valid words for latent factor {lf}")
-        return None, 0, (0, 0)
-    
-    # Calculate total score for this latent factor
-    total_score = sum(score for _, score in bps)
-    
-    # Limit the number of words to reduce memory usage
-    max_words = min(100, len(frequencies))
-    
-    # Create word cloud with constrained resources
-    try:
-        wc = WordCloud(
-            width=800,
-            height=800,
-            background_color='white',
-            max_words=max_words,
-            max_font_size=max_font_size,
-            min_font_size=min_font_size,
-            prefer_horizontal=0.9,
-            relative_scaling=0.5,
-            colormap='viridis',
-            contour_width=1,
-            contour_color='steelblue',
-            random_state=42  # For reproducibility
-        ).generate_from_frequencies(frequencies)
-        
-        # Calculate size based on total score
-        wc_size = min(500, 200 + int(total_score * 30))  # Reduced scaling factor
-        
-        log_memory_usage(f"Created word cloud for LF {lf}")
-        return wc, wc_size, (wc.width, wc.height)
-        
-    except Exception as e:
-        print(f"Error creating word cloud for LF {lf}: {str(e)}")
-        return None, 0, (0, 0)
 
 def create_visualization(
         data: Dict[str, Dict[str, float]],
@@ -266,26 +170,6 @@ def create_visualization(
     # Generate distinct colors for each latent factor
     colors = plt.cm.get_cmap('tab20', len(sorted_lfs))
     
-    # Create a circular mask for word clouds
-    def create_circular_mask(h, w, center=None, radius=None):
-        # Create a blank image with black background (0)
-        mask = np.zeros((h, w), dtype=np.uint8)
-        
-        # Create coordinates grid
-        y, x = np.ogrid[:h, :w]
-        
-        # Calculate distance from center for each point
-        if center is None:
-            center = (w//2, h//2)
-        if radius is None:
-            radius = min(center[0], center[1], w-center[0], h-center[1])
-        
-        # Create circular mask (255 for inside, 0 for outside)
-        mask_area = (x - center[0])**2 + (y - center[1])**2 <= radius**2
-        mask[mask_area] = 255
-        
-        return mask
-    
     log_memory_usage("After sorting and preparing colors")
     
     for i, (lf, bps) in enumerate(sorted_lfs):
@@ -310,7 +194,7 @@ def create_visualization(
             
         # Create word cloud for this latent factor with circular mask
         mask_size = 800  # Larger mask for better quality
-        mask = create_circular_mask(mask_size, mask_size)
+        mask = create_circular_mask(mask_size)
         
         # Create word cloud
         wc = WordCloud(
@@ -358,52 +242,10 @@ def create_visualization(
             interpolation='bilinear'
         )
         
-        # Add a subtle circular border that matches the word cloud mask
-        circle = plt.Circle((x, y), wc_width/2 * 0.95,  # Slightly smaller than word cloud
-                          fill=False, 
-                          color='#2C3E50',  # Darker border
-                          alpha=0.8, 
-                          linewidth=1.5,  # Slightly thinner border
-                          zorder=3,
-                          linestyle='-',
-                          path_effects=[patheffects.withStroke(linewidth=3, foreground='white', alpha=0.7)])
-        ax.add_patch(circle)
-        
         # Add latent factor label with colored background
         lf_label = f"LF {lf}"
         if lf == 0:
             lf_label = "Other"
-        
-        # Draw arrows for connections
-        if connections:
-            for src, tgt, weight in connections:
-                if str(src) == str(lf) and str(tgt) in lf_positions:
-                    x1, y1, r1 = lf_positions[lf]
-                    x2, y2, r2 = lf_positions[str(tgt)]
-                    
-                    # Calculate direction vector
-                    dx = x2 - x1
-                    dy = y2 - y1
-                    dist = np.sqrt(dx*dx + dy*dy)
-                    
-                    if dist > 0:  # Only draw if not the same point
-                        # Calculate start and end points on the circles
-                        start_x = x1 + (dx/dist) * r1
-                        start_y = y1 + (dy/dist) * r1
-                        end_x = x2 - (dx/dist) * r2
-                        end_y = y2 - (dy/dist) * r2
-                        
-                        # Draw arrow with weight-based width and better visibility
-                        arrow_width = 1.0 + weight * 3  # Thicker arrows
-                        arrow_alpha = 0.9  # More opaque
-                        draw_curved_arrow(ax, 
-                                        (start_x, start_y), 
-                                        (end_x, end_y),
-                                        color='#E74C3C',  # Brighter color
-                                        width=arrow_width,
-                                        alpha=arrow_alpha,
-                                        head_width=20,  # Larger arrow head
-                                        head_length=25)
         
         # Add label
         ax.text(
@@ -421,19 +263,49 @@ def create_visualization(
                 boxstyle='round,pad=0.5'
             )
         )
+    
+    # Draw arrows for connections
+    if connections:
+        # Create NetworkX DiGraph for better connection handling
+        G = nx.DiGraph()
+        for src, tgt, weight in connections:
+            G.add_edge(src, tgt, weight=weight)
         
-        # Add a circle around the word cloud
-        circle = plt.Circle(
-            (x, y), 
-            wc_size//2 * 1.05,  # Slightly larger than the word cloud
-            fill=False, 
-            edgecolor=colors(i), 
-            linewidth=2,
-            alpha=0.7,
-            linestyle='--',
-            zorder=1
-        )
-        ax.add_patch(circle)
+        # Get edge weights and sort by strength
+        edges_with_weights = [(u, v, d['weight']) for u, v, d in G.edges(data=True)]
+        edges_with_weights.sort(key=lambda x: x[2], reverse=True)
+        
+        # Only draw top 10 strongest connections to keep visualization clean
+        top_connections = edges_with_weights[:10]
+        
+        print(f"Drawing top {len(top_connections)} connections")
+        
+        for src, tgt, weight in top_connections:
+            if str(src) in lf_positions and str(tgt) in lf_positions:
+                x1, y1, r1 = lf_positions[str(src)]
+                x2, y2, r2 = lf_positions[str(tgt)]
+                
+                # Calculate direction vector
+                dx = x2 - x1
+                dy = y2 - y1
+                dist = np.sqrt(dx*dx + dy*dy)
+                
+                if dist > 0:  # Only draw if not the same point
+                    # Calculate start and end points on the circle edges
+                    start_x = x1 + (dx/dist) * r1
+                    start_y = y1 + (dy/dist) * r1
+                    end_x = x2 - (dx/dist) * r2
+                    end_y = y2 - (dy/dist) * r2
+                    
+                    # Draw arrow with weight-based width and better visibility
+                    arrow_width = 1.0 + weight * 3  # Thicker arrows
+                    arrow_alpha = 0.9  # More opaque
+                    draw_curved_arrow(ax, 
+                                    (start_x, start_y), 
+                                    (end_x, end_y),
+                                    color='#E74C3C',  # Brighter color
+                                    width=arrow_width,
+                                    alpha=arrow_alpha)
     
     # Set plot limits and remove axes
     padding = size * 0.05  # 5% padding
@@ -635,7 +507,7 @@ def main():
     else:
         # Fall back to data directory
         print(f"BP scores file not found. Loading visualization data from {args.data_dir}")
-        nodes, _ = load_visualization_data(args.data_dir)
+        nodes, connections = load_visualization_data(args.data_dir)
         if not nodes:
             print("No data to visualize. Exiting.")
             return
@@ -658,6 +530,7 @@ def main():
     print("\nGenerating visualization...")
     create_visualization(
         data=nodes,
+        connections=connections,
         output_path=args.output,
         size=args.size,
         dpi=args.dpi,
