@@ -505,10 +505,6 @@ def main():
     )
     
     print(f"Visualization saved to {os.path.abspath(args.output)}")
-    
-    except Exception as e:
-        print(f"Error generating visualization: {str(e)}")
-        raise
 
 if __name__ == "__main__":
     main()
