@@ -323,6 +323,13 @@ def create_visualization(
         )
     
     # Draw arrows for connections
+    print(f"\n=== Arrow Drawing Debug Info ===")
+    print(f"Total connections provided: {len(connections)}")
+    if connections:
+        print("Connections data:")
+        for i, conn in enumerate(connections):
+            print(f"  {i+1}. {conn}")
+    
     if connections:
         # Create NetworkX DiGraph for better connection handling
         G = nx.DiGraph()
@@ -333,12 +340,15 @@ def create_visualization(
         edges_with_weights = [(u, v, d['weight']) for u, v, d in G.edges(data=True)]
         edges_with_weights.sort(key=lambda x: x[2], reverse=True)
         
-        # Only draw top 10 strongest connections to keep visualization clean
-        top_connections = edges_with_weights[:10]
+        # Show all connections, not just top 10
+        top_connections = edges_with_weights
         
-        print(f"Drawing top {len(top_connections)} connections")
+        print(f"Drawing {len(top_connections)} connections")
+        print("Connection details:")
         
+        drawn_count = 0
         for src, tgt, weight in top_connections:
+            print(f"  Processing connection: {src} -> {tgt} (weight: {weight:.4f})")
             if str(src) in lf_positions and str(tgt) in lf_positions:
                 x1, y1, r1 = lf_positions[str(src)]
                 x2, y2, r2 = lf_positions[str(tgt)]
@@ -348,6 +358,10 @@ def create_visualization(
                 dy = y2 - y1
                 dist = np.sqrt(dx*dx + dy*dy)
                 
+                print(f"    Position LF{src}: ({x1:.2f}, {y1:.2f}), radius: {r1:.2f}")
+                print(f"    Position LF{tgt}: ({x2:.2f}, {y2:.2f}), radius: {r2:.2f}")
+                print(f"    Distance between centers: {dist:.2f}")
+                
                 if dist > 0:  # Only draw if not the same point
                     # Calculate start and end points on the circle edges
                     start_x = x1 + (dx/dist) * r1
@@ -355,15 +369,31 @@ def create_visualization(
                     end_x = x2 - (dx/dist) * r2
                     end_y = y2 - (dy/dist) * r2
                     
+                    print(f"    Arrow start: ({start_x:.2f}, {start_y:.2f})")
+                    print(f"    Arrow end: ({end_x:.2f}, {end_y:.2f})")
+                    
                     # Draw arrow with weight-based width and better visibility
-                    arrow_width = 1.0 + weight * 3  # Thicker arrows
+                    arrow_width = max(0.5, 1.0 + weight * 3)  # Thicker arrows, minimum width
                     arrow_alpha = 0.9  # More opaque
+                    print(f"    Arrow width: {arrow_width:.2f}, alpha: {arrow_alpha}")
+                    
                     draw_curved_arrow(ax, 
                                     (start_x, start_y), 
                                     (end_x, end_y),
                                     color='#E74C3C',  # Brighter color
                                     width=arrow_width,
                                     alpha=arrow_alpha)
+                    drawn_count += 1
+                else:
+                    print(f"    Skipping connection - same position")
+            else:
+                print(f"    Skipping connection - LF {src} or LF {tgt} not found in positions")
+                if str(src) not in lf_positions:
+                    print(f"      LF {src} missing from lf_positions")
+                if str(tgt) not in lf_positions:
+                    print(f"      LF {tgt} missing from lf_positions")
+        
+        print(f"Successfully drew {drawn_count} arrows")
     else:
         print("No connections to draw arrows for")
     
