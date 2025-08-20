@@ -293,24 +293,28 @@ def generate_enhanced_wordcloud(bp_scores: Dict[str, float],
     max_score = max(bp_scores.values())
     normalized_scores = {k: v / max_score for k, v in bp_scores.items()}
 
-    # Generate word cloud with better parameters
+    # Generate word cloud with better parameters to prevent overlap
     wordcloud = WordCloud(
-        width=1600,
-        height=900,
+        width=2000,  # Increased width
+        height=1200,  # Increased height
         background_color='white',
-        max_words=200,
-        max_font_size=100,
-        min_font_size=10,
-        relative_scaling=0.5,
-        scale=2,
-        random_state=42
+        max_words=150,  # Reduced number of words
+        max_font_size=120,  # Increased max font size
+        min_font_size=12,
+        relative_scaling=0.3,  # Reduced relative scaling for better size distribution
+        scale=1.5,  # Reduced scale to prevent pixelation
+        random_state=42,
+        prefer_horizontal=0.8,  # Prefer horizontal words
+        colormap='viridis',  # Better color contrast
+        collocation_threshold=20,  # Reduce word collocations
+        margin=5  # Add margin between words
     ).generate_from_frequencies(normalized_scores)
 
-    # Create figure with better layout
-    plt.figure(figsize=(24, 14), facecolor='white')
+    # Create larger figure with better layout
+    plt.figure(figsize=(30, 18), facecolor='white')  # Increased figure size
     plt.imshow(wordcloud, interpolation='bilinear')
     plt.axis('off')
-    plt.tight_layout(pad=0)
+    plt.tight_layout(pad=2.0)  # Increased padding to prevent cutoff
 
     # Add title and save
     if output_file:
