@@ -227,6 +227,11 @@ def create_visualization(
     
     log_memory_usage("After sorting and preparing colors")
     
+    # Calculate scaling factors based on number of biological processes
+    bp_counts = [len(bps) for _, bps in sorted_lfs]
+    min_count = min(bp_counts)
+    max_count = max(bp_counts)
+    
     # First, calculate all positions for word clouds
     for i, (lf, bps) in enumerate(sorted_lfs):
         # Calculate position in circle
@@ -275,9 +280,14 @@ def create_visualization(
             repeat=False
         ).generate_from_frequencies(frequencies)
         
-        # Calculate size based on total score (reduced size)
-        total_score = sum(score for _, score in bps)
-        wc_size = min(300, 150 + int(total_score * 30))  # Reduced base size and scaling
+        # Calculate size based on number of biological processes
+        bp_count = len(bps)
+        # Scale size between 150 and 300 based on bp_count
+        if max_count > min_count:
+            scale_factor = (bp_count - min_count) / (max_count - min_count)
+        else:
+            scale_factor = 0.5
+        wc_size = 150 + int(scale_factor * 150)
         
         # Store position and size for arrow connections (x, y, radius)
         lf_positions[str(lf)] = (x, y, wc_size/2)
@@ -394,7 +404,16 @@ def create_visualization(
             repeat=False
         ).generate_from_frequencies(frequencies)
         
-        # Calculate size based on total score (reduced size)
+        # Calculate size based on number of biological processes
+        bp_count = len(bps)
+        # Scale size between 150 and 300 based on bp_count
+        if max_count > min_count:
+            scale_factor = (bp_count - min_count) / (max_count - min_count)
+        else:
+            scale_factor = 0.5
+        wc_size = 150 + int(scale_factor * 150)
+        
+        # Calculate word cloud dimensions
         wc_ratio = wc.height / wc.width
         wc_width = wc_size
         wc_height = wc_size * wc_ratio
