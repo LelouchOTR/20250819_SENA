@@ -6,7 +6,7 @@ from wordcloud import WordCloud, get_single_color_func
 import matplotlib.patches as patches
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import matplotlib.colors as mcolors
-from matplotlib.patches import FancyArrowPatch, Circle, patches
+from matplotlib.patches import FancyArrowPatch, Circle
 import matplotlib.image as mpimg
 from pathlib import Path
 import random
