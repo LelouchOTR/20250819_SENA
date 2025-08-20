@@ -500,8 +500,20 @@ def main():
     
     # Create visualization
     print("Generating visualization...")
+    
+    # Convert nodes to the expected format for create_visualization
+    # nodes is a dict of {bp_name: {'score': score}}
+    # Convert to format: {bp_name: {'bp_count': score}} for visualization
+    visualization_data = {}
+    for bp_name, data in nodes.items():
+        if isinstance(data, dict) and 'score' in data:
+            visualization_data[bp_name] = {'bp_count': data['score']}
+        else:
+            # Handle case where data is already in the right format
+            visualization_data[bp_name] = data if isinstance(data, dict) else {'bp_count': 1}
+    
     create_visualization(
-        data=nodes,
+        data=visualization_data,
         connections=connections,
         output_path=args.output,
         size=args.size,
