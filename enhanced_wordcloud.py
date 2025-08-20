@@ -478,11 +478,17 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     
     # Load data
-    if args.bp_scores and os.path.exists(args.bp_scores):
-        # Use specified BP scores file
-        bp_scores = load_bp_scores(args.bp_scores)
-        nodes = {bp: {'score': score} for bp, score in bp_scores.items()}
-        connections = []
+    if args.bp_scores:
+        if os.path.exists(args.bp_scores):
+            print(f"Loading BP scores from {args.bp_scores}")
+            bp_scores = load_bp_scores(args.bp_scores)
+            print(f"Loaded {len(bp_scores)} BP scores")
+            nodes = {bp: {'bp_count': float(score)} for bp, score in bp_scores.items()}
+            connections = []
+            print(f"First few nodes: {list(nodes.items())[:3]}")
+        else:
+            print(f"Warning: BP scores file not found at {args.bp_scores}")
+            nodes, connections = load_visualization_data(args.data_dir)
     else:
         # Fall back to data directory
         print(f"Loading visualization data from {args.data_dir}")
