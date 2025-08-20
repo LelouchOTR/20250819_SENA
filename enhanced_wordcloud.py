@@ -35,13 +35,14 @@ def generate_circular_wordcloud(
     text: str, 
     size: int = 800, 
     background_color: str = 'white',
-    colormap: str = 'viridis',
+    colormap: str = 'tab20',
     max_words: int = 100,
     contour_width: float = 1.0,
     contour_color: str = 'steelblue',
     color_func=None,
     min_font_size: int = 8,
-    max_font_size: int = 100
+    max_font_size: int = 100,
+    font_path: str = None
 ) -> WordCloud:
     """Generate a circular word cloud with custom styling"""
     mask = 255 * (~create_circular_mask(size).astype(int))
@@ -56,11 +57,14 @@ def generate_circular_wordcloud(
         contour_color=contour_color,
         colormap=colormap,
         color_func=color_func,
-        prefer_horizontal=1.0,
+        prefer_horizontal=0.9,  # Allow some vertical text
         min_font_size=min_font_size,
         max_font_size=max_font_size,
         relative_scaling=0.5,
-        random_state=42
+        random_state=42,
+        font_path=font_path,  # Custom font
+        margin=0,  # No margin for tighter packing
+        normalize_plurals=False
     )
     
     return wc.generate_from_text(text)
@@ -262,18 +266,25 @@ def create_visualization(
         if node in wordclouds:
             wc, wc_size = wordclouds[node]
             
-            # Position label with size-relative offset
-            # Base offset is proportional to word cloud size (1/20th of size)
-            offset = max(5, wc_size // 20)  # Minimum 5px offset
-            label_y = y + (wc_size // 2) + offset
+            # Position label with minimal padding
+            label_y = y + (wc_size // 2) + 2  # Minimal 2px offset
+            
+            # Use a clean, modern font if available, fallback to default
+            try:
+                from matplotlib.font_manager import FontProperties
+                font = FontProperties(family='sans-serif', weight='bold')
+                font.set_size(20)  # Larger font size
+            except:
+                font = None
             
             ax.text(x, label_y, 
-                   f"LF {node_info['label']}",
+                   node_info['label'],  # No 'LF' prefix
                    ha='center', 
                    va='bottom',
-                   fontsize=16,
+                   fontsize=20,  # Larger font
                    fontweight='bold',
-                   color='#333333',
+                   color='#111111',  # Darker gray for better contrast
+                   fontproperties=font,
                    zorder=5)
             img = wc.to_array()
             
@@ -296,33 +307,7 @@ def create_visualization(
             )
             ax.add_artist(ab)
     
-    # Create a legend showing LF numbers with their word cloud's dominant color
-    legend_elements = []
-    for node, (x, y, node_info) in sorted(node_positions.items(), 
-                                        key=lambda x: int(x[1][2]['label'])):
-        if node in wordclouds:
-            legend_elements.append(patches.Patch(facecolor=node_info['color'],
-                                              edgecolor='none',
-                                              label=f"LF {node_info['label']}"))
-    
-    # Add legend to the plot
-    legend = ax.legend(handles=legend_elements, 
-                      loc='upper right', 
-                      bbox_to_anchor=(0.98, 0.98),
-                      frameon=True,
-                      framealpha=0.9,
-                      edgecolor='#DDDDDD',
-                      title='Latent Factors',
-                      title_fontsize=12,
-                      fontsize=11,
-                      borderpad=0.8,
-                      handlelength=1.5,
-                      handleheight=1.5,
-                      handletextpad=0.5,
-                      borderaxespad=0.8)
-    
-    # Make legend frame slightly rounded
-    legend.get_frame().set_boxstyle('round', pad=0.2, rounding_size=0.5)
+    # No legend - removed per user request
     
     # Draw connections between nodes with arrowheads
     for src, tgt, weight in connections:
