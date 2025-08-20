@@ -113,9 +113,11 @@ def create_visualization(
     fig, ax = plt.subplots(figsize=(size/100, size/100), dpi=dpi, facecolor='white')
     ax.set_facecolor('white')
     
-    # Generate color palette
-    colors = list(plt.cm.tab20.colors)
-    random.shuffle(colors)
+    # Generate distinct colors for nodes
+    colors = [
+        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+    ]
     
     # Generate word clouds and store their positions
     node_positions = {}
@@ -226,21 +228,21 @@ def create_visualization(
         if node in wordclouds:
             wc, wc_size = wordclouds[node]
             
-            # Add clear, prominent LF label above word cloud
-            label_y = y + (wc_size // 2) + 2  # Minimal spacing
+            # Add LF label directly above word cloud with minimal spacing
+            label_y = y + (wc_size // 2)  # Right at the top edge
             ax.text(x, label_y, 
-                   f"LF {node_info['label']}",  # Explicit LF prefix
+                   f"LF {node_info['label']}",
                    ha='center', 
                    va='bottom',
-                   fontsize=12,  # Larger font
+                   fontsize=14,  # Larger, more prominent
                    fontweight='bold',
-                   color=node_info['color'],
+                   color=node_info['color'],  # Match node color
                    bbox=dict(
                        facecolor='white',
-                       alpha=0.95,  # More opaque
-                       edgecolor='none',
-                       boxstyle='round,pad=0.05',  # Minimal padding
-                       linewidth=0.5
+                       alpha=0.98,  # More opaque
+                       edgecolor=node_info['color'],  # Colored border matching word cloud
+                       boxstyle='round,pad=0.02',  # Minimal padding
+                       linewidth=1
                    ),
                    zorder=5)
             img = wc.to_array()
@@ -280,15 +282,17 @@ def create_visualization(
             if distance > 0:
                 direction = direction / distance
                 
-                # Get node and word cloud info
+                # Get source and target info with word cloud sizes
                 src_info = node_positions[src][2]
                 tgt_info = node_positions[tgt][2]
                 
-                # Calculate edge points at word cloud boundaries
-                # Use word cloud size for more accurate edge targeting
-                wc_radius = wordclouds[tgt][1] // 2 if tgt in wordclouds else tgt_info['radius']
-                start = np.array(start) + direction * src_info['radius']
-                end = np.array(end) - direction * (wc_radius * 0.9)  # Stop at word cloud edge
+                # Calculate exact edge points at word cloud boundaries
+                src_wc_radius = wordclouds[src][1] // 2 if src in wordclouds else src_info['radius']
+                tgt_wc_radius = wordclouds[tgt][1] // 2 if tgt in wordclouds else tgt_info['radius']
+                
+                # Calculate edge points starting and ending at word cloud edges
+                start = np.array(start) + direction * (src_wc_radius * 0.95)  # Start from source edge
+                end = np.array(end) - direction * (tgt_wc_radius * 0.95)  # End at target edge
                 
                 # Draw arrow with weight-based width
                 draw_curved_arrow(
