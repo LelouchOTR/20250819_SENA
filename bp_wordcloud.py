@@ -277,7 +277,80 @@ def map_genes_to_bp(gene_scores: Dict[str, float],
 
     return result
 
-    return bp_scores
+
+def extract_causal_connections(model_data) -> List[Tuple[str, str, float]]:
+    """Extract causal connections from model data.
+    
+    Args:
+        model_data: Loaded model data (could be state_dict or model object)
+        
+    Returns:
+        List of connections as (source, target, weight) tuples
+    """
+    print("Extracting causal connections from model...")
+    causal_graph = None
+    
+    # Try different ways to extract causal graph
+    if hasattr(model_data, 'G') and model_data.G is not None:
+        # Model object with G attribute
+        causal_graph = model_data.G.detach().cpu().numpy()
+        print("Found causal graph in model.G")
+    elif isinstance(model_data, dict):
+        # State dict
+        for key, value in model_data.items():
+            if 'causal_graph' in key.lower() or 'G' in key:
+                if torch.is_tensor(value):
+                    causal_graph = value.detach().cpu().numpy()
+                    print(f"Found causal graph in state_dict key: {key}")
+                    break
+                elif isinstance(value, np.ndarray):
+                    causal_graph = value
+                    print(f"Found causal graph in state_dict key: {key}")
+                    break
+    elif isinstance(model_data, tuple) and len(model_data) > 0:
+        # Handle tuple format (state_dict, config, stats)
+        state_dict = model_data[0]
+        for key, value in state_dict.items():
+            if 'causal_graph' in key.lower() or 'G' in key:
+                if torch.is_tensor(value):
+                    causal_graph = value.detach().cpu().numpy()
+                    print(f"Found causal graph in tuple state_dict key: {key}")
+                    break
+                elif isinstance(value, np.ndarray):
+                    causal_graph = value
+                    print(f"Found causal graph in tuple state_dict key: {key}")
+                    break
+    
+    if causal_graph is None:
+        print("Warning: Could not find causal graph in model data")
+        return []
+    
+    print(f"Causal graph shape: {causal_graph.shape}")
+    
+    # Extract connections - assuming it's a square matrix
+    connections = []
+    n_nodes = min(causal_graph.shape[0], causal_graph.shape[1], 10)  # Limit to 10 for visualization
+    
+    # Get all connections with their weights
+    for i in range(n_nodes):
+        for j in range(n_nodes):
+            if i != j:  # Skip self-connections
+                weight = abs(causal_graph[i, j])
+                # Only include connections with significant weights
+                if weight > 0.01:  # Threshold to avoid too many weak connections
+                    connections.append((str(i), str(j), float(weight)))
+    
+    # Sort by weight and keep top connections
+    connections.sort(key=lambda x: x[2], reverse=True)
+    top_connections = connections[:50]  # Keep top 50 connections
+    
+    print(f"Extracted {len(top_connections)} causal connections")
+    if top_connections:
+        print("Top 5 connections:")
+        for src, tgt, weight in top_connections[:5]:
+            print(f"  Node {src} -> Node {tgt}: {weight:.4f}")
+    
+    return top_connections
 
 
 def generate_enhanced_wordcloud(bp_scores: Dict[str, float],
@@ -357,11 +430,27 @@ def extract_gene_scores(model_path: str) -> Dict[str, float]:
             raise ValueError("Could not find decoder weights in the model")
 
     else:
-        # Assume model_data is already the weights tensor
-        decoder_weights = model_data
+        # Assume model_data is already the weights tensor or has weights as attributes
+        decoder_weights = None
+        if hasattr(model_data, 'decoder') and hasattr(model_data.decoder, 'weight'):
+            decoder_weights = model_data.decoder.weight
+        elif hasattr(model_data, 'fc_mean') and hasattr(model_data.fc_mean, 'weight'):
+            decoder_weights = model_data.fc_mean.weight
+        elif isinstance(model_data, dict):
+            # Look in state dict
+            for k, v in model_data.items():
+                if ('decoder' in k or 'fc_mean' in k) and 'weight' in k and len(v.shape) == 2:
+                    decoder_weights = v
+                    break
+        
+        if decoder_weights is None:
+            raise ValueError("Could not find decoder weights in the model")
 
     # Calculate L2 norm of each gene's weights
-    gene_scores = torch.norm(decoder_weights, p=2, dim=0)
+    if torch.is_tensor(decoder_weights):
+        gene_scores = torch.norm(decoder_weights, p=2, dim=0)
+    else:
+        gene_scores = torch.norm(torch.tensor(decoder_weights), p=2, dim=0)
 
     # Convert to dict with gene IDs - use both GENE_X and numeric IDs for compatibility
     gene_scores_dict = {}
@@ -406,11 +495,25 @@ def main():
             print("No biological processes found with the given criteria.")
             return
 
+        # Extract causal connections from model
+        model_data = torch.load(model_path, map_location='cpu')
+        causal_connections = extract_causal_connections(model_data)
+        
+        # Add connections to result
+        result['connections'] = causal_connections
+
         # Save BP scores with latent factors to JSON
         output_file = OUTPUT_DIR / 'bp_scores.json'
         with open(output_file, 'w') as f:
             json.dump(result, f, indent=2)
         print(f"\nBP scores with latent factors saved to {output_file}")
+
+        # Save causal connections separately for clarity
+        connections_file = OUTPUT_DIR / 'causal_connections.json'
+        connections_data = {'connections': causal_connections}
+        with open(connections_file, 'w') as f:
+            json.dump(connections_data, f, indent=2)
+        print(f"Causal connections saved to {connections_file}")
 
         # Print summary
         metadata = result.get('metadata', {})
@@ -418,6 +521,7 @@ def main():
         print(f"Total BPs: {metadata.get('total_bps', 0)}")
         print(f"Latent factors: {metadata.get('latent_factors', 0)}")
         print(f"Gene count range: {metadata.get('min_genes', 'N/A')}-{metadata.get('max_genes', 'N/A')}")
+        print(f"Causal connections: {len(causal_connections)}")
 
         # Generate word cloud for each latent factor
         print("\n=== Generating word clouds ===")

@@ -94,6 +94,53 @@ def draw_curved_arrow(ax, start, end, color='#444444', width=1.0, alpha=0.9):
     ax.add_patch(arrow)
 
 
+def extract_causal_connections(causal_graph_matrix: np.ndarray, 
+                              latent_factors: Dict[int, List[Tuple[str, float]]],
+                              threshold: float = 0.1) -> List[Tuple[str, str, float]]:
+    """Extract causal connections between latent factors from the causal graph matrix
+    
+    Args:
+        causal_graph_matrix: The causal graph matrix from the model
+        latent_factors: Dictionary mapping latent factor IDs to their BP data
+        threshold: Minimum connection strength to visualize
+        
+    Returns:
+        List of connections as (source_lf, target_lf, weight) tuples
+    """
+    connections = []
+    n_factors = len(latent_factors)
+    
+    if causal_graph_matrix is None:
+        print("Warning: No causal graph matrix provided")
+        return connections
+        
+    print(f"Causal graph matrix shape: {causal_graph_matrix.shape}")
+    print(f"Number of latent factors: {n_factors}")
+    
+    # Check if matrix dimensions match number of latent factors
+    if causal_graph_matrix.shape[0] < n_factors or causal_graph_matrix.shape[1] < n_factors:
+        print(f"Warning: Causal graph matrix too small for {n_factors} latent factors")
+        return connections
+    
+    # Extract top connections between latent factors
+    for i in range(n_factors):
+        for j in range(n_factors):
+            if i != j:  # Skip self-connections
+                weight = abs(causal_graph_matrix[i, j])
+                if weight > threshold:
+                    connections.append((str(i), str(j), float(weight)))
+    
+    print(f"Extracted {len(connections)} causal connections")
+    if connections:
+        # Sort by weight and show top connections
+        connections.sort(key=lambda x: x[2], reverse=True)
+        print("Top 5 connections:")
+        for src, tgt, weight in connections[:5]:
+            print(f"  LF {src} -> LF {tgt}: {weight:.4f}")
+    
+    return connections
+
+
 def create_visualization(
         data: Dict[str, Dict[str, float]],
         connections: List[Tuple[str, str, float]] = None,
@@ -306,6 +353,8 @@ def create_visualization(
                                     color='#E74C3C',  # Brighter color
                                     width=arrow_width,
                                     alpha=arrow_alpha)
+    else:
+        print("No connections to draw arrows for")
     
     # Set plot limits and remove axes
     padding = size * 0.05  # 5% padding
@@ -386,15 +435,22 @@ def load_visualization_data(data_dir='visualization_output'):
     Returns:
         tuple: (nodes_dict, connections_list) where nodes_dict is a dictionary
         with BP names as keys and their scores as values,
-        and connections_list is an empty list (not used for BP word cloud)
+        and connections_list is a list of connections from causal graph
     """
     # First try to load BP scores
     bp_scores_path = os.path.join(data_dir, 'bp_scores.json')
     if os.path.exists(bp_scores_path):
-        bp_scores = load_bp_scores(bp_scores_path)
-        # Convert to nodes format expected by visualization
-        nodes_dict = {bp: {'score': score} for bp, score in bp_scores.items()}
-        return nodes_dict, []
+        with open(bp_scores_path, 'r') as f:
+            bp_data = json.load(f)
+        
+        # Extract BP data
+        nodes_dict = bp_data.get('bp_data', {})
+        
+        # Extract connections if available
+        connections_list = bp_data.get('connections', [])
+        
+        print(f"Loaded {len(nodes_dict)} BPs and {len(connections_list)} connections")
+        return nodes_dict, connections_list
 
     # Fall back to original node/connection format
     try:
@@ -507,6 +563,16 @@ def main():
                 nodes[bp] = {'bp_count': float(data), 'latent_factor': 0}
                 
         print(f"First few nodes: {list(nodes.items())[:3]}")
+        
+        # Try to load connections from the same directory
+        connections_path = os.path.join(os.path.dirname(args.bp_scores), 'causal_connections.json')
+        if os.path.exists(connections_path):
+            with open(connections_path, 'r') as f:
+                connections_data = json.load(f)
+                connections = connections_data.get('connections', [])
+                print(f"Loaded {len(connections)} causal connections")
+        else:
+            print("No causal connections file found")
     else:
         # Fall back to data directory
         print(f"BP scores file not found. Loading visualization data from {args.data_dir}")
