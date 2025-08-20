@@ -12,15 +12,34 @@ import json
 from model import CMVAE, NetworkActivity_layer
 from utils import Norman2019DataLoader, Wessel2023HEK293DataLoader
 import argparse
+import glob
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def find_model_file(directory):
+    """Find the model file in the directory"""
+    # First check for best_model.pt
+    best_model_path = os.path.join(directory, 'best_model.pt')
+    if os.path.exists(best_model_path):
+        return best_model_path
+    
+    # If best_model.pt doesn't exist, look for other .pt files
+    pt_files = glob.glob(os.path.join(directory, '*.pt'))
+    if pt_files:
+        # Sort by modification time, newest first
+        pt_files.sort(key=os.path.getmtime, reverse=True)
+        logging.info(f"Found model files: {pt_files}")
+        logging.info(f"Using the newest model file: {pt_files[0]}")
+        return pt_files[0]
+    
+    return None
 
 def generating_data(config_file, fpath, batch_size=32):
     """Generate activation scores using config file approach"""
     
     ## detect device
-    device = "cuda:0" if torch.cuda.isavailable() else "cpu"
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
     # define parameters
     dataset_name = config_file["dataset_name"]
@@ -54,14 +73,12 @@ def generating_data(config_file, fpath, batch_size=32):
 
     """load best model"""
     #load weights
-    model_path = f'{fpath}/best_model.pt'
-    logging.info(f"Loading model from {model_path}")
+    model_path = find_model_file(fpath)
+    if model_path is None:
+        raise FileNotFoundError(f"No model files found in {fpath}")
     
-    # Check if model file exists
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model file not found at {model_path}")
-        
-    model = torch.load(model_path)
+    logging.info(f"Loading model from {model_path}")
+    model = torch.load(model_path, map_location='cpu')
     
     # Debug: print model structure
     logging.info(f"Model type: {type(model)}")
@@ -404,8 +421,12 @@ if __name__ == "__main__":
             logging.warning(f"Config file not found at {config_path}")
             logging.info("Attempting to generate activation scores without config...")
             # Try to generate data without config
+            model_path = find_model_file(fpath)
+            if model_path is None:
+                raise FileNotFoundError(f"No model files found in {fpath}")
+            
             try:
-                generating_data_from_model_path(os.path.join(fpath, 'best_model.pt'))
+                generating_data_from_model_path(model_path)
             except Exception as e:
                 logging.error(f"Error generating data: {e}")
                 import traceback
