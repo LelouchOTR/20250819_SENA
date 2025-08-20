@@ -113,16 +113,19 @@ def create_visualization(
     fig, ax = plt.subplots(figsize=(size/100, size/100), dpi=dpi, facecolor='white')
     ax.set_facecolor('white')
     
-    # Generate distinct colors for word clouds
+    # Generate distinct colors for word clouds and store them with node info
     colors = [
         '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
         '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
     ]
-    # LF labels will use dark gray for consistency
+    # Store color with node info for consistency
     
     # Generate word clouds and store their positions
     node_positions = {}
     wordclouds = {}
+    
+    # Store color mapping for consistent use
+    color_mapping = {}
     
     # Get all BP counts to normalize sizes
     all_bp_counts = [node_data.get('bp_count', 1) for node_data in data.values()]
@@ -180,19 +183,36 @@ def create_visualization(
             wc_size = 375  # Default size if all BP counts are the same
             
         # Generate word cloud with biological process names
-        # Join all terms with spaces and create a single string
-        text = ' '.join(terms)
-        color = plt.cm.get_cmap('tab20')(i % 20)
+        # Get or assign color for this node
+        node_label = str(node).replace('LF_', '')
+        if node not in color_mapping:
+            color_mapping[node] = colors[len(color_mapping) % len(colors)]
+        node_color = color_mapping[node]
         
-        # Create a circular word cloud with biological process names
+        node_info = {
+            'x': x,
+            'y': y,
+            'radius': all_bp_sizes[i] / 2,
+            'color': node_color,
+            'label': node_label
+        }
+        node_positions[node] = (x, y, node_info)
+        
+        # Create a custom color function using the node's color
+        def color_func(word, **kwargs):
+            return node_color
+            
+        # Generate word cloud with consistent coloring
         wc = generate_circular_wordcloud(
-            text,
+            ' '.join(terms),
             size=wc_size,
-            color_func=get_single_color_func(mcolors.to_hex(color)),
+            color_func=color_func,
+            max_words=100,
+            min_font_size=8,
+            max_font_size=min(100, wc_size // 8),
             background_color='white',
-            max_words=20,  # Limit number of terms for better visibility
-            min_font_size=10,  # Increased minimum font size for better readability
-            max_font_size=min(120, wc_size // 8)  # Scale max font size with word cloud size
+            contour_width=1.5,
+            contour_color=node_color
         )
         wordclouds[node] = (wc, wc_size)  # Store both wordcloud and its size
         
