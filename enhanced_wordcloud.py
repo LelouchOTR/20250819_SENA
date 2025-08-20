@@ -42,11 +42,14 @@ def generate_circular_wordcloud(
     color_func=None,
     min_font_size: int = 8,
     max_font_size: int = 100,
-    font_path: str = None
-) -> WordCloud:
+    font_path: str = None,
+    frequencies: dict = None
+):
     """Generate a circular word cloud with custom styling"""
-    mask = 255 * (~create_circular_mask(size).astype(int))
+    # Generate the circular mask
+    mask = create_circular_mask(size)
     
+    # Create the word cloud
     wc = CustomWordCloud(
         width=size,
         height=size,
@@ -55,19 +58,24 @@ def generate_circular_wordcloud(
         max_words=max_words,
         contour_width=contour_width,
         contour_color=contour_color,
-        colormap=colormap,
         color_func=color_func,
-        prefer_horizontal=0.9,  # Allow some vertical text
         min_font_size=min_font_size,
         max_font_size=max_font_size,
+        font_path=font_path,
+        colormap=colormap,
+        prefer_horizontal=1.0,
         relative_scaling=0.5,
         random_state=42,
-        font_path=font_path,  # Custom font
         margin=0,  # No margin for tighter packing
         normalize_plurals=False
     )
     
-    return wc.generate_from_text(text)
+    if frequencies:
+        return wc.generate_from_frequencies(frequencies)
+    elif text:
+        return wc.generate_from_text(text)
+    else:
+        raise ValueError("Either text or frequencies must be provided")
 
 def draw_curved_arrow(ax, start, end, color='#444444', width=1.0, alpha=0.9):
     """Draw a curved arrow between two points with precise edge targeting"""
@@ -193,26 +201,98 @@ def create_visualization(
             color_mapping[node] = colors[len(color_mapping) % len(colors)]
         node_color = color_mapping[node]
         
-        node_info = {
-            'x': x,
-            'y': y,
-            'radius': all_bp_sizes[i] / 2,
-            'color': node_color,
-            'label': node_label
-        }
-        node_positions[node] = (x, y, node_info)
-        
-        # Generate word cloud with default coloring
+    # Group BPs by latent factor and calculate total scores
+    latent_factors = {}
+    for bp_name, bp_data in data.items():
+        if 'latent_factor' in bp_data:
+            lf = bp_data['latent_factor']
+            if lf not in latent_factors:
+                latent_factors[lf] = {'bps': [], 'total_score': 0}
+            latent_factors[lf]['bps'].append((bp_name, bp_data['bp_count']))
+            latent_factors[lf]['total_score'] += bp_data['bp_count']
+    
+    if not latent_factors:
+        print("No latent factor information found. Creating a single word cloud.")
+        # Fallback to single word cloud if no latent factors
+        frequencies = {bp_name: bp_data['bp_count'] for bp_name, bp_data in data.items()}
         wc = generate_circular_wordcloud(
-            ' '.join(terms),
-            size=wc_size,
-            max_words=100,
-            min_font_size=8,
-            max_font_size=min(100, wc_size // 8),
+            text=None,
+            size=size,
             background_color='white',
-            contour_width=1.5,
-            colormap='tab20'  # Use a colormap that provides good color variety
+            colormap='tab20',
+            max_words=len(frequencies),
+            min_font_size=min_font_size,
+            max_font_size=max_font_size,
+            frequencies=frequencies
         )
+        plt.figure(figsize=(size/100, size/100), dpi=dpi)
+        plt.imshow(wc, interpolation='bilinear')
+        plt.axis('off')
+        plt.tight_layout(pad=0)
+        plt.savefig(output_path, dpi=dpi, bbox_inches='tight', pad_inches=0)
+        plt.close()
+        print(f"Word cloud saved to {os.path.abspath(output_path)}")
+        return
+    
+    # Sort latent factors by total score
+    sorted_lfs = sorted(latent_factors.items(), 
+                        key=lambda x: x[1]['total_score'], 
+                        reverse=True)
+    
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(size/100, size/100), dpi=dpi)
+    ax.set_xlim(0, size)
+    ax.set_ylim(0, size)
+    ax.axis('off')
+    
+    # Calculate positions in a circle
+    n = len(sorted_lfs)
+    center = size // 2
+    max_radius = size * 0.4
+    positions = []
+    
+    for i, (lf, lf_data) in enumerate(sorted_lfs):
+        # Calculate position in circle
+        angle = 2 * np.pi * i / n
+        radius = max_radius * 0.7  # Keep some margin from the edge
+        x = center + radius * np.cos(angle)
+        y = center + radius * np.sin(angle)
+        positions.append((x, y))
+        
+        # Calculate size based on total score (log scale for better visualization)
+        lf_score = lf_data['total_score']
+        lf_size = min_font_size + (max_font_size - min_font_size) * (lf_score / max_bp)
+        
+        # Create word cloud for this latent factor
+        frequencies = dict(lf_data['bps'])
+        wc = generate_circular_wordcloud(
+            text=None,
+            size=int(lf_size * 10),  # Scale up for better quality
+            background_color='white',
+            colormap='tab20',
+            max_words=len(frequencies),
+            min_font_size=min_font_size,
+            max_font_size=max_font_size,
+            frequencies=frequencies
+        )
+        
+        # Add word cloud to plot
+        ax.imshow(wc, extent=(
+            x - lf_size/2, x + lf_size/2,
+            y - lf_size/2, y + lf_size/2
+        ), aspect='auto', zorder=2)
+        
+        # Add latent factor label
+        ax.text(x, y - lf_size/2 - 10, f"LF_{lf}", 
+                ha='center', va='top', fontsize=10, 
+                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=2))
+    
+    # Save the final figure
+    plt.tight_layout(pad=0)
+    plt.savefig(output_path, dpi=dpi, bbox_inches='tight', pad_inches=0)
+    plt.close()
+    print(f"Word cloud saved to {os.path.abspath(output_path)}")
+    return
         
         # Get the most frequent color from the word cloud (excluding background)
         wc_array = wc.to_array()
