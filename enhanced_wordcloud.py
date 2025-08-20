@@ -229,15 +229,18 @@ def create_visualization(
         if node in wordclouds:
             wc, wc_size = wordclouds[node]
             
-            # Add clean, minimal LF label above word cloud
-            label_y = y + (wc_size // 2) + 2  # Slight offset from edge
+            # Position label with size-relative offset
+            # Base offset is proportional to word cloud size (1/20th of size)
+            offset = max(5, wc_size // 20)  # Minimum 5px offset
+            label_y = y + (wc_size // 2) + offset
+            
             ax.text(x, label_y, 
                    f"LF {node_info['label']}",
                    ha='center', 
                    va='bottom',
-                   fontsize=16,  # Larger for better visibility
+                   fontsize=16,
                    fontweight='bold',
-                   color='#333333',  # Dark gray for better contrast
+                   color='#333333',
                    zorder=5)
             img = wc.to_array()
             
