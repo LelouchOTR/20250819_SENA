@@ -254,49 +254,73 @@ def create_visualization(
         drawn_count = 0
         for src, tgt, weight in top_connections:
             print(f"  Processing connection: {src} -> {tgt} (weight: {weight:.4f})")
-            if str(src) in lf_positions and str(tgt) in lf_positions:
-                x1, y1, r1 = lf_positions[str(src)]
-                x2, y2, r2 = lf_positions[str(tgt)]
+            # Convert to integers for comparison with actual latent factors
+            try:
+                src_int = int(src)
+                tgt_int = int(tgt)
+            except ValueError:
+                print(f"    Skipping connection - non-integer latent factors")
+                continue
                 
-                # Calculate direction vector
-                dx = x2 - x1
-                dy = y2 - y1
-                dist = np.sqrt(dx*dx + dy*dy)
+            # Check if both latent factors exist in our data
+            if src_int in [lf[0] for lf in sorted_lfs] and tgt_int in [lf[0] for lf in sorted_lfs]:
+                # Find positions in sorted_lfs
+                src_idx = None
+                tgt_idx = None
+                for i, (lf_id, _) in enumerate(sorted_lfs):
+                    if lf_id == src_int:
+                        src_idx = i
+                    if lf_id == tgt_int:
+                        tgt_idx = i
                 
-                print(f"    Position LF{src}: ({x1:.2f}, {y1:.2f}), radius: {r1:.2f}")
-                print(f"    Position LF{tgt}: ({x2:.2f}, {y2:.2f}), radius: {r2:.2f}")
-                print(f"    Distance between centers: {dist:.2f}")
-                
-                if dist > 0:  # Only draw if not the same point
-                    # Calculate start and end points on the circle edges
-                    start_x = x1 + (dx/dist) * r1
-                    start_y = y1 + (dy/dist) * r1
-                    end_x = x2 - (dx/dist) * r2
-                    end_y = y2 - (dy/dist) * r2
+                if src_idx is not None and tgt_idx is not None:
+                    x1, y1, r1 = lf_positions.get(str(src_int), (None, None, None))
+                    x2, y2, r2 = lf_positions.get(str(tgt_int), (None, None, None))
                     
-                    print(f"    Arrow start: ({start_x:.2f}, {start_y:.2f})")
-                    print(f"    Arrow end: ({end_x:.2f}, {end_y:.2f})")
-                    
-                    # Draw arrow with weight-based width and better visibility
-                    arrow_width = max(0.5, 1.0 + weight * 3)  # Thicker arrows, minimum width
-                    arrow_alpha = 0.7  # More transparent
-                    print(f"    Arrow width: {arrow_width:.2f}, alpha: {arrow_alpha}")
-                    
-                    draw_curved_arrow(ax, 
-                                    (start_x, start_y), 
-                                    (end_x, end_y),
-                                    color='#D3D3D3',  # Light gray
-                                    width=arrow_width,
-                                    alpha=arrow_alpha)
-                    drawn_count += 1
+                    if x1 is not None and x2 is not None:
+                        # Calculate direction vector
+                        dx = x2 - x1
+                        dy = y2 - y1
+                        dist = np.sqrt(dx*dx + dy*dy)
+                        
+                        print(f"    Position LF{src_int}: ({x1:.2f}, {y1:.2f}), radius: {r1:.2f}")
+                        print(f"    Position LF{tgt_int}: ({x2:.2f}, {y2:.2f}), radius: {r2:.2f}")
+                        print(f"    Distance between centers: {dist:.2f}")
+                        
+                        if dist > 0:  # Only draw if not the same point
+                            # Calculate start and end points on the circle edges
+                            start_x = x1 + (dx/dist) * r1
+                            start_y = y1 + (dy/dist) * r1
+                            end_x = x2 - (dx/dist) * r2
+                            end_y = y2 - (dy/dist) * r2
+                            
+                            print(f"    Arrow start: ({start_x:.2f}, {start_y:.2f})")
+                            print(f"    Arrow end: ({end_x:.2f}, {end_y:.2f})")
+                            
+                            # Draw arrow with weight-based width and better visibility
+                            arrow_width = max(0.5, 1.0 + weight * 3)  # Thicker arrows, minimum width
+                            arrow_alpha = 0.7  # More transparent
+                            print(f"    Arrow width: {arrow_width:.2f}, alpha: {arrow_alpha}")
+                            
+                            draw_curved_arrow(ax, 
+                                            (start_x, start_y), 
+                                            (end_x, end_y),
+                                            color='#D3D3D3',  # Light gray
+                                            width=arrow_width,
+                                            alpha=arrow_alpha)
+                            drawn_count += 1
+                        else:
+                            print(f"    Skipping connection - same position")
+                    else:
+                        print(f"    Skipping connection - positions not yet calculated")
                 else:
-                    print(f"    Skipping connection - same position")
+                    print(f"    Skipping connection - LF indices not found in sorted_lfs")
             else:
-                print(f"    Skipping connection - LF {src} or LF {tgt} not found in positions")
-                if str(src) not in lf_positions:
-                    print(f"      LF {src} missing from lf_positions")
-                if str(tgt) not in lf_positions:
-                    print(f"      LF {tgt} missing from lf_positions")
+                print(f"    Skipping connection - LF {src_int} or LF {tgt_int} not found in data")
+                if src_int not in [lf[0] for lf in sorted_lfs]:
+                    print(f"      LF {src_int} missing from data")
+                if tgt_int not in [lf[0] for lf in sorted_lfs]:
+                    print(f"      LF {tgt_int} missing from data")
         
         print(f"Successfully drew {drawn_count} arrows")
     else:
