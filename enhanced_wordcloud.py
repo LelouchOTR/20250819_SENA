@@ -64,7 +64,7 @@ def create_circular_mask(size: int) -> np.ndarray:
     return mask
 
 
-def draw_curved_arrow(ax, start, end, color='#D3D3D3', width=1.0, alpha=0.7):
+def draw_curved_arrow(ax, start, end, color='#1f77b4', width=1.0, alpha=0.8):
     """Draw a curved arrow between two points with precise edge targeting"""
     from matplotlib.patches import FancyArrowPatch
     
@@ -85,11 +85,11 @@ def draw_curved_arrow(ax, start, end, color='#D3D3D3', width=1.0, alpha=0.7):
         color=color,
         linewidth=width * 1.2,  # Slightly thicker line
         alpha=alpha,
-        mutation_scale=15,  # Smaller arrowhead
-        connectionstyle=f'arc3,rad={0.2}',
+        mutation_scale=20,  # Larger arrowhead for better visibility
+        connectionstyle=f'arc3,rad={0.3}',
         shrinkA=0,  # No shrinking at start
-        shrinkB=0,  # No shrinking at end - we'll handle this manually
-        zorder=1  # Place behind word clouds and labels
+        shrinkB=5,  # Small shrink at end to avoid overlapping with word cloud
+        zorder=3  # Place in front of word clouds but behind labels
     )
     ax.add_patch(arrow)
 
@@ -227,106 +227,7 @@ def create_visualization(
     
     log_memory_usage("After sorting and preparing colors")
     
-    # Draw arrows first (behind everything else)
-    print(f"\n=== Arrow Drawing Debug Info ===")
-    print(f"Total connections provided: {len(connections)}")
-    if connections:
-        print("Connections data:")
-        for i, conn in enumerate(connections):
-            print(f"  {i+1}. {conn}")
-    
-    if connections:
-        # Create NetworkX DiGraph for better connection handling
-        G = nx.DiGraph()
-        for src, tgt, weight in connections:
-            G.add_edge(src, tgt, weight=weight)
-        
-        # Get edge weights and sort by strength
-        edges_with_weights = [(u, v, d['weight']) for u, v, d in G.edges(data=True)]
-        edges_with_weights.sort(key=lambda x: x[2], reverse=True)
-        
-        # Show all connections, not just top 10
-        top_connections = edges_with_weights
-        
-        print(f"Drawing {len(top_connections)} connections")
-        print("Connection details:")
-        
-        drawn_count = 0
-        for src, tgt, weight in top_connections:
-            print(f"  Processing connection: {src} -> {tgt} (weight: {weight:.4f})")
-            # Convert to integers for comparison with actual latent factors
-            try:
-                src_int = int(src)
-                tgt_int = int(tgt)
-            except ValueError:
-                print(f"    Skipping connection - non-integer latent factors")
-                continue
-                
-            # Check if both latent factors exist in our data
-            if src_int in [lf[0] for lf in sorted_lfs] and tgt_int in [lf[0] for lf in sorted_lfs]:
-                # Find positions in sorted_lfs
-                src_idx = None
-                tgt_idx = None
-                for i, (lf_id, _) in enumerate(sorted_lfs):
-                    if lf_id == src_int:
-                        src_idx = i
-                    if lf_id == tgt_int:
-                        tgt_idx = i
-                
-                if src_idx is not None and tgt_idx is not None:
-                    x1, y1, r1 = lf_positions.get(str(src_int), (None, None, None))
-                    x2, y2, r2 = lf_positions.get(str(tgt_int), (None, None, None))
-                    
-                    if x1 is not None and x2 is not None:
-                        # Calculate direction vector
-                        dx = x2 - x1
-                        dy = y2 - y1
-                        dist = np.sqrt(dx*dx + dy*dy)
-                        
-                        print(f"    Position LF{src_int}: ({x1:.2f}, {y1:.2f}), radius: {r1:.2f}")
-                        print(f"    Position LF{tgt_int}: ({x2:.2f}, {y2:.2f}), radius: {r2:.2f}")
-                        print(f"    Distance between centers: {dist:.2f}")
-                        
-                        if dist > 0:  # Only draw if not the same point
-                            # Calculate start and end points on the circle edges
-                            start_x = x1 + (dx/dist) * r1
-                            start_y = y1 + (dy/dist) * r1
-                            end_x = x2 - (dx/dist) * r2
-                            end_y = y2 - (dy/dist) * r2
-                            
-                            print(f"    Arrow start: ({start_x:.2f}, {start_y:.2f})")
-                            print(f"    Arrow end: ({end_x:.2f}, {end_y:.2f})")
-                            
-                            # Draw arrow with weight-based width and better visibility
-                            arrow_width = max(0.5, 1.0 + weight * 3)  # Thicker arrows, minimum width
-                            arrow_alpha = 0.7  # More transparent
-                            print(f"    Arrow width: {arrow_width:.2f}, alpha: {arrow_alpha}")
-                            
-                            draw_curved_arrow(ax, 
-                                            (start_x, start_y), 
-                                            (end_x, end_y),
-                                            color='#D3D3D3',  # Light gray
-                                            width=arrow_width,
-                                            alpha=arrow_alpha)
-                            drawn_count += 1
-                        else:
-                            print(f"    Skipping connection - same position")
-                    else:
-                        print(f"    Skipping connection - positions not yet calculated")
-                else:
-                    print(f"    Skipping connection - LF indices not found in sorted_lfs")
-            else:
-                print(f"    Skipping connection - LF {src_int} or LF {tgt_int} not found in data")
-                if src_int not in [lf[0] for lf in sorted_lfs]:
-                    print(f"      LF {src_int} missing from data")
-                if tgt_int not in [lf[0] for lf in sorted_lfs]:
-                    print(f"      LF {tgt_int} missing from data")
-        
-        print(f"Successfully drew {drawn_count} arrows")
-    else:
-        print("No connections to draw arrows for")
-    
-    # Draw word clouds and labels after arrows
+    # First, calculate all positions for word clouds
     for i, (lf, bps) in enumerate(sorted_lfs):
         # Calculate position in circle
         angle = 2 * np.pi * i / n
@@ -378,13 +279,125 @@ def create_visualization(
         total_score = sum(score for _, score in bps)
         wc_size = min(300, 150 + int(total_score * 30))  # Reduced base size and scaling
         
-        # Calculate position and size for the word cloud
+        # Store position and size for arrow connections (x, y, radius)
+        lf_positions[str(lf)] = (x, y, wc_size/2)
+    
+    # Draw arrows (now that all positions are known)
+    print(f"\n=== Arrow Drawing Debug Info ===")
+    print(f"Total connections provided: {len(connections)}")
+    if connections:
+        print("Connections data:")
+        for i, conn in enumerate(connections):
+            print(f"  {i+1}. {conn}")
+    
+    if connections:
+        # Show all connections, not just top 10
+        top_connections = connections
+        
+        print(f"Drawing {len(top_connections)} connections")
+        print("Connection details:")
+        
+        drawn_count = 0
+        for src, tgt, weight in top_connections:
+            print(f"  Processing connection: {src} -> {tgt} (weight: {weight:.4f})")
+                
+            # Check if both latent factors exist in our data
+            if src in lf_positions and tgt in lf_positions:
+                x1, y1, r1 = lf_positions[src]
+                x2, y2, r2 = lf_positions[tgt]
+                
+                print(f"    Position LF{src}: ({x1:.2f}, {y1:.2f}), radius: {r1:.2f}")
+                print(f"    Position LF{tgt}: ({x2:.2f}, {y2:.2f}), radius: {r2:.2f}")
+                
+                # Calculate direction vector
+                dx = x2 - x1
+                dy = y2 - y1
+                dist = np.sqrt(dx*dx + dy*dy)
+                
+                print(f"    Distance between centers: {dist:.2f}")
+                
+                if dist > 0:  # Only draw if not the same point
+                    # Calculate start and end points on the circle edges
+                    start_x = x1 + (dx/dist) * r1
+                    start_y = y1 + (dy/dist) * r1
+                    end_x = x2 - (dx/dist) * r2
+                    end_y = y2 - (dy/dist) * r2
+                    
+                    print(f"    Arrow start: ({start_x:.2f}, {start_y:.2f})")
+                    print(f"    Arrow end: ({end_x:.2f}, {end_y:.2f})")
+                    
+                    # Draw arrow with weight-based width and better visibility
+                    arrow_width = max(0.5, 1.0 + weight * 10)  # More responsive width scaling
+                    arrow_alpha = 0.8  # Less transparent
+                    print(f"    Arrow width: {arrow_width:.2f}, alpha: {arrow_alpha}")
+                    
+                    draw_curved_arrow(ax, 
+                                    (start_x, start_y), 
+                                    (end_x, end_y),
+                                    color='#1f77b4',  # More visible blue color
+                                    width=arrow_width,
+                                    alpha=arrow_alpha)
+                    drawn_count += 1
+                else:
+                    print(f"    Skipping connection - same position")
+            else:
+                print(f"    Skipping connection - LF {src} or LF {tgt} not found in positions")
+                if src not in lf_positions:
+                    print(f"      LF {src} missing from positions")
+                if tgt not in lf_positions:
+                    print(f"      LF {tgt} missing from positions")
+        
+        print(f"Successfully drew {drawn_count} arrows")
+    else:
+        print("No connections to draw arrows for")
+    
+    # Draw word clouds and labels after calculating all positions
+    for i, (lf, bps) in enumerate(sorted_lfs):
+        # Get position
+        x, y, wc_radius = lf_positions[str(lf)]
+        wc_size = wc_radius * 2  # Convert radius back to diameter
+        
+        # Combine all BPs for this latent factor into a single word cloud
+        frequencies = {}
+        for bp_name, score in bps:
+            # Split BP name into words and add each word with the score
+            for word in bp_name.split():
+                # Remove any non-alphanumeric characters from the word
+                word = ''.join(c for c in word if c.isalnum())
+                if word:  # Only add non-empty words
+                    frequencies[word] = frequencies.get(word, 0) + score
+        
+        if not frequencies:
+            continue
+            
+        # Create word cloud for this latent factor with circular mask
+        mask_size = 800  # Larger mask for better quality
+        mask = create_circular_mask(mask_size)
+        
+        # Create word cloud
+        wc = WordCloud(
+            width=mask_size,
+            height=mask_size,
+            mask=mask,
+            background_color='white',
+            max_words=150,
+            max_font_size=max_font_size,
+            min_font_size=min_font_size,
+            prefer_horizontal=0.9,
+            relative_scaling=0.5,
+            colormap=plt.cm.get_cmap('viridis'),
+            contour_width=0,
+            margin=2,
+            normalize_plurals=True,
+            scale=1.0,
+            mode='RGBA',
+            repeat=False
+        ).generate_from_frequencies(frequencies)
+        
+        # Calculate size based on total score (reduced size)
         wc_ratio = wc.height / wc.width
         wc_width = wc_size
         wc_height = wc_size * wc_ratio
-        
-        # Store position for arrow connections (x, y, radius)
-        lf_positions[str(lf)] = (x, y, wc_width/2)
         
         # Add word cloud to plot
         ax.imshow(
@@ -420,7 +433,7 @@ def create_visualization(
                 edgecolor='none', 
                 boxstyle='round,pad=0.5'
             ),
-            zorder=3  # Place in front of arrows
+            zorder=4  # Place in front of arrows and word clouds
         )
     
     # Set plot limits and remove axes
