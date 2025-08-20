@@ -279,23 +279,21 @@ def generate_enhanced_wordcloud(bp_scores: Dict[str, float],
     if not bp_scores:
         print("No biological processes to visualize.")
         return
-    
+        
     print(f"Generating word cloud with {len(bp_scores)} biological processes...")
     
     # Normalize scores for better visualization
-    max_score = max(bp_scores.values()) if bp_scores else 1
-    normalized_scores = {k: (v / max_score) * 100 for k, v in bp_scores.items()}
+    max_score = max(bp_scores.values())
+    normalized_scores = {k: v/max_score for k, v in bp_scores.items()}
     
-    # Create word cloud with better settings
+    # Generate word cloud with better parameters
     wordcloud = WordCloud(
-        width=2000,
-        height=1200,
+        width=1600,
+        height=900,
         background_color='white',
-        max_words=100,
-        colormap='viridis',
-        prefer_horizontal=0.8,
+        max_words=200,
+        max_font_size=100,
         min_font_size=10,
-        max_font_size=200,
         relative_scaling=0.5,
         scale=2,
         random_state=42
@@ -309,15 +307,19 @@ def generate_enhanced_wordcloud(bp_scores: Dict[str, float],
     
     # Add title and save
     if output_file:
-        output_path = OUTPUT_DIR / output_file
+        # Ensure output directory exists
+        output_path = Path(output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Save the word cloud image
         plt.savefig(output_path, bbox_inches='tight', dpi=300, facecolor='white')
-        print(f"Word cloud saved to {output_path}")
+        print(f"Word cloud saved to {output_path.absolute()}")
         
         # Save the data used for the word cloud
         data_path = output_path.with_suffix('.json')
         with open(data_path, 'w') as f:
             json.dump(bp_scores, f, indent=2)
-        print(f"Biological process data saved to {data_path}")
+        print(f"Biological process data saved to {data_path.absolute()}")
     else:
         plt.show()
 
@@ -406,13 +408,15 @@ def main():
         
         # Generate word cloud for each latent factor
         print("\n=== Generating word clouds ===")
+        # Ensure output directory exists
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         output_img = OUTPUT_DIR / 'bp_wordcloud.png'
         
         # For now, generate a single word cloud with all BPs
         # The enhanced_wordcloud.py will handle the latent factor visualization
         generate_enhanced_wordcloud(
             {bp: data['bp_count'] for bp, data in result['bp_data'].items()}, 
-            str(output_img)
+            str(output_img.absolute())
         )
         
         print("\nDone! Check the visualization_output directory for the word cloud and data.")
