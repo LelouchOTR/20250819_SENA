@@ -250,19 +250,31 @@ def create_visualization(
         print(f"Warning: Limiting to top {max_latent_factors} latent factors")
         sorted_lfs = sorted_lfs[:max_latent_factors]
     
+    # Store positions for arrow connections
+    lf_positions = {}
+    
     # Generate distinct colors for each latent factor
     colors = plt.cm.get_cmap('tab20', len(sorted_lfs))
     
     # Create a circular mask for word clouds
     def create_circular_mask(h, w, center=None, radius=None):
-        if center is None:  # use the middle of the image
-            center = (int(w/2), int(h/2))
-        if radius is None:  # use the smallest distance between the center and image walls
+        # Create a blank image with white background
+        mask = 255 * np.ones((h, w), dtype=np.uint8)
+        
+        # Create coordinates grid
+        y, x = np.ogrid[:h, :w]
+        
+        # Calculate distance from center for each point
+        if center is None:
+            center = (w//2, h//2)
+        if radius is None:
             radius = min(center[0], center[1], w-center[0], h-center[1])
-        Y, X = np.ogrid[:h, :w]
-        dist_from_center = np.sqrt((X - center[0])**2 + (Y - center[1])**2)
-        mask = dist_from_center <= radius
-        return 255 * mask.astype(int)
+            
+        # Create circular mask (0 for outside, 255 for inside)
+        mask_area = (x - center[0])**2 + (y - center[1])**2 <= radius**2
+        mask[~mask_area] = 0
+        
+        return mask
     
     log_memory_usage("After sorting and preparing colors")
     
@@ -286,49 +298,59 @@ def create_visualization(
             print(f"No valid words for latent factor {lf}")
             continue
             
-        # Create circular mask for this word cloud
-        mask_size = 800  # Larger mask for better quality
-        mask = create_circular_mask(mask_size, mask_size, radius=mask_size//2)
-        
         # Create word cloud for this latent factor with circular mask
+        mask_size = 800  # Larger mask for better quality
+        mask = create_circular_mask(mask_size, mask_size)
+        
+        # Create word cloud
         wc = WordCloud(
             width=mask_size,
             height=mask_size,
             mask=mask,
             background_color='white',
-            max_words=150,  # Slightly fewer words for better spacing
-            max_font_size=max_font_size * 1.5,  # Larger font for better visibility
+            max_words=150,
+            max_font_size=max_font_size,
             min_font_size=min_font_size,
-            prefer_horizontal=0.8,
-            relative_scaling=0.4,  # Better spacing between words
+            prefer_horizontal=0.9,
+            relative_scaling=0.5,
             colormap=plt.cm.get_cmap('viridis'),
-            contour_width=0,  # Remove contour for cleaner look
-            margin=5,  # Add margin between words
+            contour_width=0,
+            margin=2,
             normalize_plurals=True,
-            scale=2.0  # Higher scale for better quality
+            scale=1.0,
+            mode='RGBA',
+            repeat=False
         ).generate_from_frequencies(frequencies)
         
         # Calculate size based on total score
         total_score = sum(score for _, score in bps)
         wc_size = min(500, 200 + int(total_score * 50))  # Scale size based on total score
         
-        # Add word cloud to plot with proper aspect ratio and spacing
-        wc_ratio = wc_size / mask_size  # Maintain aspect ratio
+        # Calculate position and size for the word cloud
+        wc_ratio = wc.height / wc.width
+        wc_width = wc_size
+        wc_height = wc_size * wc_ratio
+        
+        # Store position for arrow connections
+        lf_positions[lf] = (x, y, wc_width/2)
+        
+        # Add word cloud to plot
         ax.imshow(
-            wc, 
+            wc,
             extent=(
-                x - (wc_size//2) * 1.2,  # Add 20% more spacing
-                x + (wc_size//2) * 1.2,  # Add 20% more spacing
-                y - (wc_size//2) * wc_ratio * 1.2,  # Maintain aspect ratio with spacing
-                y + (wc_size//2) * wc_ratio * 1.2  # Maintain aspect ratio with spacing
+                x - wc_width/2,
+                x + wc_width/2,
+                y - wc_height/2,
+                y + wc_height/2
             ),
-            alpha=0.95,  # Slight transparency for better overlapping visualization
-            zorder=2  # Ensure word clouds are above grid lines
+            alpha=0.95,
+            zorder=2,
+            interpolation='bilinear'
         )
         
         # Add a subtle circular border
-        circle = plt.Circle((x, y), wc_size//2 * 1.05, 
-                          fill=False, color='#888888', 
+        circle = plt.Circle((x, y), wc_width/2 * 0.95,  # Slightly smaller than word cloud
+                          fill=False, color='#888888',
                           alpha=0.5, linewidth=1, zorder=3)
         ax.add_patch(circle)
         
@@ -336,10 +358,39 @@ def create_visualization(
         lf_label = f"LF {lf}"
         if lf == 0:
             lf_label = "Other"
-            
+        
+        # Draw arrows for connections
+        if connections:
+            for src, tgt, weight in connections:
+                if str(src) == str(lf) and str(tgt) in lf_positions:
+                    x1, y1, r1 = lf_positions[lf]
+                    x2, y2, r2 = lf_positions[str(tgt)]
+                    
+                    # Calculate direction vector
+                    dx = x2 - x1
+                    dy = y2 - y1
+                    dist = np.sqrt(dx*dx + dy*dy)
+                    
+                    if dist > 0:  # Only draw if not the same point
+                        # Calculate start and end points on the circles
+                        start_x = x1 + (dx/dist) * r1
+                        start_y = y1 + (dy/dist) * r1
+                        end_x = x2 - (dx/dist) * r2
+                        end_y = y2 - (dy/dist) * r2
+                        
+                        # Draw arrow with weight-based width
+                        arrow_width = 0.5 + weight * 2  # Scale width by weight
+                        draw_curved_arrow(ax, 
+                                        (start_x, start_y), 
+                                        (end_x, end_y),
+                                        color='#666666',
+                                        width=arrow_width,
+                                        alpha=0.7)  # Slightly transparent
+        
+        # Add label
         ax.text(
             x, 
-            y - wc_size//2 - 10, 
+            y - wc_size//2 - 15,  # Position above the word cloud
             lf_label,
             ha='center', 
             va='top', 
