@@ -46,9 +46,23 @@ def generating_data(config_file, fpath,  batch_size = 32):
         else:
             idx_dict[knockout] = (adata.obs[adata.obs[data_handler.gene_var] == knockout]).index.values
 
+    # Debug: print first few perturbation targets
+    logging.info(f"Found {len(ptb_targets)} perturbation targets")
+    logging.info(f"First few targets: {ptb_targets[:5]}")
+    logging.info(f"First few GO terms: {gos[:5] if gos else 'None'}")
+
     """load best model"""
     #load weights
-    model = torch.load(f'{fpath}/best_model.pt')
+    model_path = f'{fpath}/best_model.pt'
+    logging.info(f"Loading model from {model_path}")
+    model = torch.load(model_path)
+    
+    # Debug: print model structure
+    logging.info(f"Model type: {type(model)}")
+    if hasattr(model, '__dict__'):
+        logging.info(f"Model attributes: {list(vars(model).keys())}")
+    if hasattr(model, 'G'):
+        logging.info(f"Causal graph G shape: {model.G.shape if model.G is not None else 'None'}")
 
     ##
     n_pertb = len(ptb_targets)
@@ -142,15 +156,35 @@ def generating_data(config_file, fpath,  batch_size = 32):
     #add pertb_dict
     results_dict['pert_map'] = pd.DataFrame(pert_dict, index = [0]).T
     results_dict['pert_map'].columns = ['c_enc_mapping']
-    results_dict['causal_graph'] = model.G.detach().cpu().numpy()
+    
+    # Debug: print causal graph info
+    if hasattr(model, 'G'):
+        results_dict['causal_graph'] = model.G.detach().cpu().numpy()
+        logging.info(f"Causal graph extracted with shape: {results_dict['causal_graph'].shape}")
+        # Print first few elements of causal graph
+        cg = results_dict['causal_graph']
+        logging.info(f"First few elements of causal graph:\n{cg[:5, :5] if cg.shape[0] >= 5 and cg.shape[1] >= 5 else cg}")
+    else:
+        logging.warning("Model does not have attribute 'G' for causal graph")
+        results_dict['causal_graph'] = None
 
     """add weights layers (delta) for """
     results_dict['mean_delta_matrix'] = pd.DataFrame(model.fc_mean.weight.detach().cpu().numpy().T, index = gos) 
     results_dict['std_delta_matrix'] = pd.DataFrame(model.fc_var.weight.detach().cpu().numpy().T, index = gos) 
 
     """save info"""
-    with open(os.path.join(fpath, 'activation_scores.pickle'), 'wb') as handle:
+    output_path = os.path.join(fpath, 'activation_scores.pickle')
+    logging.info(f"Saving activation scores to {output_path}")
+    with open(output_path, 'wb') as handle:
         pickle.dump(results_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    
+    # Debug: print what was saved
+    logging.info(f"Saved keys in results_dict: {list(results_dict.keys())}")
+    for key, value in results_dict.items():
+        if hasattr(value, 'shape'):
+            logging.info(f"  {key}: shape {value.shape}")
+        else:
+            logging.info(f"  {key}: type {type(value)}")
 
 if __name__ == "__main__":
 
@@ -162,11 +196,16 @@ if __name__ == "__main__":
     
     # Define fpath
     fpath = os.path.join(os.getcwd(), 'results', args.folder_name)
+    logging.info(f"Working directory: {fpath}")
 
     #get dataset_name
-    with open(os.path.join(fpath,'config.json'), 'r') as file:
+    config_path = os.path.join(fpath,'config.json')
+    logging.info(f"Loading config from {config_path}")
+    with open(config_path, 'r') as file:
         config_file = json.load(file)
+    
+    # Debug: print config contents
+    logging.info(f"Config contents: {config_file}")
     
     #generate pickle
     generating_data(config_file, fpath)
-

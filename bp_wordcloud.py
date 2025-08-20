@@ -62,13 +62,25 @@ def load_go_data() -> Tuple[GODag, Dict, Dict]:
             gene_to_go[gene_id].append(go_id)
 
     print(f"{len(gene2go_processed)} GO terms loaded with {len(gene_to_go)} unique gene IDs (including GENE_X format)")
+    # Debug: print first few GO terms and their genes
+    print("First few GO terms and their genes:")
+    for i, (go_id, genes) in enumerate(gene2go_processed.items()):
+        if i >= 3:
+            break
+        print(f"  GO:{go_id}: {list(genes)[:5]}")
     return godag, gene_to_go, gene2go_processed
 
 
 def get_bp_terms(godag: GODag) -> List[str]:
     """Get list of biological process GO terms."""
-    return [go_id for go_id, term in godag.items()
+    bp_terms = [go_id for go_id, term in godag.items()
             if term.namespace == 'biological_process']
+    print(f"Found {len(bp_terms)} biological process terms")
+    # Debug: print first few BP terms
+    print("First few BP terms:")
+    for i, term in enumerate(bp_terms[:5]):
+        print(f"  {term}: {godag[term].name}")
+    return bp_terms
 
 
 def process_bp_name(name: str) -> str:
@@ -97,6 +109,13 @@ def get_gene_to_go(gene2go: Dict) -> Dict[str, List[str]]:
     gene_to_go = defaultdict(list)
     for gene_id, terms in gene2go.items():
         gene_to_go[gene_id].extend(terms)
+    print(f"Created gene-to-GO mapping for {len(gene_to_go)} genes")
+    # Debug: print first few gene mappings
+    print("First few gene-to-GO mappings:")
+    for i, (gene_id, terms) in enumerate(gene_to_go.items()):
+        if i >= 3:
+            break
+        print(f"  {gene_id}: {terms[:3]}")
     return gene_to_go
 
 
@@ -133,6 +152,12 @@ def filter_bp_terms(godag: GODag,
         print(f"{ns}: {count} terms")
 
     print(f"\nBiological processes after initial filtering: {len(filtered)}")
+    # Debug: print first few filtered terms
+    print("First few filtered BP terms:")
+    for i, (go_id, data) in enumerate(filtered.items()):
+        if i >= 3:
+            break
+        print(f"  GO:{go_id} ({data['name']}): {data['gene_count']} genes")
 
     if not filtered:
         print("\n=== WARNING: No BPs passed initial filtering! ===")
@@ -152,7 +177,7 @@ def filter_bp_terms(godag: GODag,
 
         # Get all ancestor terms
         ancestors = set()
-        for ancestor in godag[go_id].get_all_parents():
+        for ancestor in goddag[go_id].get_all_parents():
             if ancestor in filtered:
                 ancestors.add(ancestor)
 
@@ -174,6 +199,12 @@ def filter_bp_terms(godag: GODag,
         del filtered[go_id]
 
     print(f"BPs after removing redundancy: {len(filtered)}")
+    # Debug: print first few final terms
+    print("First few final BP terms:")
+    for i, (go_id, data) in enumerate(filtered.items()):
+        if i >= 3:
+            break
+        print(f"  GO:{go_id} ({data['name']}): {data['gene_count']} genes")
 
     # Print some example BPs
     if filtered:
@@ -207,6 +238,13 @@ def map_genes_to_bp(gene_scores: Dict[str, float],
         Dictionary mapping BP names to their data including score and latent factor
     """
     print("\n=== Mapping gene scores to biological processes ===")
+    print(f"Gene scores provided for {len(gene_scores)} genes")
+    # Debug: print first few gene scores
+    print("First few gene scores:")
+    for i, (gene_id, score) in enumerate(gene_scores.items()):
+        if i >= 5:
+            break
+        print(f"  {gene_id}: {score}")
 
     # Filter BP terms
     filtered_bps = filter_bp_terms(godag, go2genes, min_genes, max_genes)
@@ -290,6 +328,19 @@ def extract_causal_connections(model_data) -> List[Tuple[str, str, float]]:
     print("Extracting causal connections from model...")
     causal_graph = None
     
+    # Debug: print model data structure
+    print(f"Model data type: {type(model_data)}")
+    if hasattr(model_data, '__dict__'):
+        print("Model attributes:", list(vars(model_data).keys()))
+    elif isinstance(model_data, dict):
+        print("Model dict keys:", list(model_data.keys()))
+    elif isinstance(model_data, tuple):
+        print("Model tuple length:", len(model_data))
+        for i, item in enumerate(model_data):
+            print(f"  Item {i} type: {type(item)}")
+            if isinstance(item, dict):
+                print(f"  Item {i} keys: {list(item.keys())}")
+    
     # Try different ways to extract causal graph
     if hasattr(model_data, 'G') and model_data.G is not None:
         # Model object with G attribute
@@ -310,22 +361,62 @@ def extract_causal_connections(model_data) -> List[Tuple[str, str, float]]:
     elif isinstance(model_data, tuple) and len(model_data) > 0:
         # Handle tuple format (state_dict, config, stats)
         state_dict = model_data[0]
-        for key, value in state_dict.items():
-            if 'causal_graph' in key.lower() or 'G' in key:
-                if torch.is_tensor(value):
-                    causal_graph = value.detach().cpu().numpy()
-                    print(f"Found causal graph in tuple state_dict key: {key}")
-                    break
-                elif isinstance(value, np.ndarray):
-                    causal_graph = value
-                    print(f"Found causal graph in tuple state_dict key: {key}")
-                    break
-    
+        print(f"State dict type: {type(state_dict)}")
+        if isinstance(state_dict, dict):
+            print("State dict keys:", list(state_dict.keys()))
+            for key, value in state_dict.items():
+                if 'causal_graph' in key.lower() or 'G' in key:
+                    if torch.is_tensor(value):
+                        causal_graph = value.detach().cpu().numpy()
+                        print(f"Found causal graph in tuple state_dict key: {key}")
+                        break
+                    elif isinstance(value, np.ndarray):
+                        causal_graph = value
+                        print(f"Found causal graph in tuple state_dict key: {key}")
+                        break
+    else:
+        # Try to find any 2D tensor in the model that might be the causal graph
+        def find_tensor(obj):
+            if torch.is_tensor(obj) and obj.dim() == 2 and obj.size(0) == obj.size(1):
+                return obj.detach().cpu().numpy()
+            elif isinstance(obj, (list, tuple)):
+                for item in obj:
+                    result = find_tensor(item)
+                    if result is not None:
+                        return result
+            elif hasattr(obj, '__dict__'):
+                for key, value in vars(obj).items():
+                    if 'causal' in key.lower() or 'G' in key:
+                        result = find_tensor(value)
+                        if result is not None:
+                            return result
+            return None
+        
+        causal_graph = find_tensor(model_data)
+        if causal_graph is not None:
+            print("Found causal graph using recursive search")
+
     if causal_graph is None:
         print("Warning: Could not find causal graph in model data")
+        # Debug: print all possible keys/attributes to help locate it
+        if isinstance(model_data, dict):
+            print("Available keys in model dict:")
+            for key in model_data.keys():
+                print(f"  {key}")
+        elif hasattr(model_data, '__dict__'):
+            print("Available attributes in model object:")
+            for attr in vars(model_data).keys():
+                print(f"  {attr}")
+        elif isinstance(model_data, tuple):
+            print("Available items in model tuple:")
+            for i, item in enumerate(model_data):
+                print(f"  {i}: {type(item)}")
         return []
     
     print(f"Causal graph shape: {causal_graph.shape}")
+    # Debug: print first few elements of the causal graph
+    print("First few elements of causal graph:")
+    print(causal_graph[:5, :5] if causal_graph.shape[0] >= 5 and causal_graph.shape[1] >= 5 else causal_graph)
     
     # Extract connections - assuming it's a square matrix
     connections = []
@@ -412,18 +503,31 @@ def extract_gene_scores(model_path: str) -> Dict[str, float]:
     """Extract gene importance scores from model."""
     print(f"Loading model from {model_path}...")
     model_data = torch.load(model_path, map_location='cpu')
+    
+    # Debug: print model data structure
+    print(f"Model data type: {type(model_data)}")
+    if isinstance(model_data, tuple):
+        print(f"Model tuple length: {len(model_data)}")
+        for i, item in enumerate(model_data):
+            print(f"  Item {i} type: {type(item)}")
+    elif hasattr(model_data, '__dict__'):
+        print("Model attributes:", list(vars(model_data).keys()))
 
     # Extract gene importance scores (using L2 norm of decoder weights as a proxy)
     print("Extracting gene importance scores...")
     if isinstance(model_data, tuple):
         # Handle tuple format (state_dict, config, stats)
         state_dict = model_data[0]
+        print(f"State dict type: {type(state_dict)}")
+        if isinstance(state_dict, dict):
+            print("State dict keys:", list(state_dict.keys()))
 
         # Look for decoder weights in the state dict
         decoder_weights = None
         for k, v in state_dict.items():
             if 'decoder' in k and 'weight' in k and len(v.shape) == 2:
                 decoder_weights = v
+                print(f"Found decoder weights in key: {k}, shape: {v.shape}")
                 break
 
         if decoder_weights is None:
@@ -434,13 +538,16 @@ def extract_gene_scores(model_path: str) -> Dict[str, float]:
         decoder_weights = None
         if hasattr(model_data, 'decoder') and hasattr(model_data.decoder, 'weight'):
             decoder_weights = model_data.decoder.weight
+            print(f"Found decoder weights in model.decoder.weight, shape: {decoder_weights.shape}")
         elif hasattr(model_data, 'fc_mean') and hasattr(model_data.fc_mean, 'weight'):
             decoder_weights = model_data.fc_mean.weight
+            print(f"Found decoder weights in model.fc_mean.weight, shape: {decoder_weights.shape}")
         elif isinstance(model_data, dict):
             # Look in state dict
             for k, v in model_data.items():
                 if ('decoder' in k or 'fc_mean' in k) and 'weight' in k and len(v.shape) == 2:
                     decoder_weights = v
+                    print(f"Found decoder weights in key: {k}, shape: {v.shape}")
                     break
         
         if decoder_weights is None:
@@ -459,6 +566,12 @@ def extract_gene_scores(model_path: str) -> Dict[str, float]:
         gene_scores_dict[str(i + 1)] = score.item()  # Add numeric ID mapping (1-based to match GO)
 
     print(f"Extracted scores for {len(gene_scores)} genes (with both GENE_X and numeric IDs)")
+    # Debug: print first few gene scores
+    print("First few gene scores:")
+    for i, (gene_id, score) in enumerate(gene_scores_dict.items()):
+        if i >= 10:
+            break
+        print(f"  {gene_id}: {score}")
     return gene_scores_dict
 
 

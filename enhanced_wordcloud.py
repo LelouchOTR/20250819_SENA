@@ -117,9 +117,14 @@ def extract_causal_connections(causal_graph_matrix: np.ndarray,
     print(f"Causal graph matrix shape: {causal_graph_matrix.shape}")
     print(f"Number of latent factors: {n_factors}")
     
+    # Debug: print first few elements of the causal graph matrix
+    print("First few elements of causal graph matrix:")
+    print(causal_graph_matrix[:5, :5] if causal_graph_matrix.shape[0] >= 5 and causal_graph_matrix.shape[1] >= 5 else causal_graph_matrix)
+    
     # Check if matrix dimensions match number of latent factors
     if causal_graph_matrix.shape[0] < n_factors or causal_graph_matrix.shape[1] < n_factors:
         print(f"Warning: Causal graph matrix too small for {n_factors} latent factors")
+        print(f"Matrix dimensions: {causal_graph_matrix.shape}")
         return connections
     
     # Extract top connections between latent factors
@@ -187,6 +192,9 @@ def create_visualization(
         latent_factors[lf].append((bp_name, bp_data.get('bp_count', 1)))
     
     print(f"Found {len(latent_factors)} latent factors")
+    print("Latent factors distribution:")
+    for lf_id, bp_list in latent_factors.items():
+        print(f"  LF {lf_id}: {len(bp_list)} biological processes")
     log_memory_usage("After grouping by latent factor")
     
     # Calculate positions in a circle with better spacing
@@ -224,6 +232,9 @@ def create_visualization(
         angle = 2 * np.pi * i / n
         x = center + radius * np.cos(angle)
         y = center + radius * np.sin(angle)
+        
+        # Debug: print first few BPs for this latent factor
+        print(f"LF {lf} - First 3 BPs: {[bp[0] for bp in bps[:3]]}")
         
         # Combine all BPs for this latent factor into a single word cloud
         frequencies = {}
@@ -422,10 +433,19 @@ def create_visualization(
 
 def load_bp_scores(bp_scores_file: str):
     """Load biological process scores from JSON file"""
+    print(f"Loading BP scores from: {bp_scores_file}")
     with open(bp_scores_file, 'r') as f:
         data = json.load(f)
     # If the data has a 'bp_data' key, return that, otherwise return the whole data
-    return data.get('bp_data', data)
+    result = data.get('bp_data', data)
+    print(f"Loaded {len(result)} BP entries")
+    # Debug: print first few entries
+    print("First few BP entries:")
+    for i, (key, value) in enumerate(result.items()):
+        if i >= 3:
+            break
+        print(f"  {key}: {value}")
+    return result
 
 
 def load_visualization_data(data_dir='visualization_output'):
@@ -440,6 +460,7 @@ def load_visualization_data(data_dir='visualization_output'):
     # First try to load BP scores
     bp_scores_path = os.path.join(data_dir, 'bp_scores.json')
     if os.path.exists(bp_scores_path):
+        print(f"Loading BP scores from: {bp_scores_path}")
         with open(bp_scores_path, 'r') as f:
             bp_data = json.load(f)
         
@@ -450,12 +471,25 @@ def load_visualization_data(data_dir='visualization_output'):
         connections_list = bp_data.get('connections', [])
         
         print(f"Loaded {len(nodes_dict)} BPs and {len(connections_list)} connections")
+        # Debug: print first few nodes and connections
+        print("First few nodes:")
+        for i, (key, value) in enumerate(nodes_dict.items()):
+            if i >= 3:
+                break
+            print(f"  {key}: {value}")
+        print("First few connections:")
+        for i, conn in enumerate(connections_list):
+            if i >= 3:
+                break
+            print(f"  {conn}")
+        
         return nodes_dict, connections_list
 
     # Fall back to original node/connection format
     try:
         # Load nodes data
         nodes_path = os.path.join(data_dir, 'nodes.json')
+        print(f"Loading nodes from: {nodes_path}")
         with open(nodes_path, 'r') as f:
             nodes_data = json.load(f)
 
@@ -476,6 +510,14 @@ def load_visualization_data(data_dir='visualization_output'):
                     'bp_count': node.get('bp_count', 0),
                     'score': node.get('score', 0)
                 }
+
+        print(f"Loaded {len(nodes_dict)} nodes and {len(connections_list)} connections from legacy format")
+        # Debug: print first few nodes
+        print("First few nodes:")
+        for i, (key, value) in enumerate(nodes_dict.items()):
+            if i >= 3:
+                break
+            print(f"  {key}: {value}")
 
         return nodes_dict, connections_list
 
@@ -566,11 +608,18 @@ def main():
         
         # Try to load connections from the same directory
         connections_path = os.path.join(os.path.dirname(args.bp_scores), 'causal_connections.json')
+        print(f"Looking for causal connections at: {connections_path}")
         if os.path.exists(connections_path):
             with open(connections_path, 'r') as f:
                 connections_data = json.load(f)
                 connections = connections_data.get('connections', [])
                 print(f"Loaded {len(connections)} causal connections")
+                # Debug: print first few connections
+                print("First few connections:")
+                for i, conn in enumerate(connections):
+                    if i >= 3:
+                        break
+                    print(f"  {conn}")
         else:
             print("No causal connections file found")
     else:
