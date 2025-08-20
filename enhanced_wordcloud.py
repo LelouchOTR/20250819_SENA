@@ -214,7 +214,7 @@ def create_visualization(
                        reverse=True)
     
     # Limit to top N latent factors if there are too many
-    max_latent_factors = 10  # Limit to prevent memory issues
+    max_latent_factors = 15  # Increased limit to accommodate more latent factors
     if len(sorted_lfs) > max_latent_factors:
         print(f"Warning: Limiting to top {max_latent_factors} latent factors")
         sorted_lfs = sorted_lfs[:max_latent_factors]
