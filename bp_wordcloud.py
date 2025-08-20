@@ -185,55 +185,78 @@ def map_genes_to_bp(gene_scores: Dict[str, float],
                    godag: GODag,
                    go2genes: Dict[str, set],
                    min_genes: int = 5,
-                   max_genes: int = 30) -> Dict[str, float]:
-    """Map gene scores to filtered biological process scores."""
-    print("\n=== Mapping genes to biological processes ===")
-    print(f"Total genes with scores: {len(gene_scores)}")
-    print(f"Total GO terms in gene2go: {len(gene_to_go)}")
+                   max_genes: int = 30) -> Dict[str, dict]:
+    """
+    Map gene scores to filtered biological process scores with latent factor information.
+    
+    Args:
+        gene_scores: Dictionary mapping gene IDs to their importance scores
+        gene_to_go: Dictionary mapping gene IDs to their GO terms
+        godag: GO DAG structure
+        go2genes: Dictionary mapping GO terms to their genes
+        min_genes: Minimum number of genes a BP should have
+        max_genes: Maximum number of genes a BP should have
+        
+    Returns:
+        Dictionary mapping BP names to their data including score and latent factor
+    """
+    print("\n=== Mapping gene scores to biological processes ===")
     
     # Filter BP terms
-    filtered_bp = filter_bp_terms(godag, go2genes, min_genes, max_genes)
-    print(f"\nFiltered BP terms: {len(filtered_bp)}")
+    filtered_bps = filter_bp_terms(godag, go2genes, min_genes, max_genes)
     
-    # Calculate BP scores based on gene importance
-    bp_scores = {}
-    gene_scores_set = set(gene_scores.keys())
-    print(f"Genes in both model and GO annotations: {len(gene_scores_set & set(gene_to_go.keys()))}")
+    if not filtered_bps:
+        print("No BPs passed filtering. Try adjusting min_genes and max_genes.")
+        return {}
     
-    # Debug: Track some statistics
-    total_genes_in_bp = 0
-    bps_with_enough_genes = 0
+    # Map GO terms to their filtered BP data
+    go_to_bp = {go_id: data for go_id, data in filtered_bps.items()}
     
-    for go_id, data in tqdm(filtered_bp.items(), desc="Scoring BPs"):
-        # Get intersection with dataset genes
-        bp_genes = data['genes'] & gene_scores_set
-        total_genes_in_bp += len(bp_genes)
+    # For each BP, calculate average gene score and assign to latent factor
+    bp_data = {}
+    
+    for go_id, bp_info in tqdm(go_to_bp.items(), desc="Scoring BPs"):
+        bp_name = process_bp_name(bp_info['name'])
+        genes_in_bp = bp_info['genes']
         
-        # Only include if we have enough genes in our dataset
-        if len(bp_genes) >= min_genes:
-            bps_with_enough_genes += 1
-            # Calculate average gene importance for this BP
-            total_score = sum(gene_scores.get(gene, 0) for gene in bp_genes)
-            score = total_score / len(bp_genes) if bp_genes else 0
+        # Get scores for genes in this BP
+        scores = []
+        for gene_id in genes_in_bp:
+            if gene_id in gene_scores:
+                scores.append(gene_scores[gene_id])
+        
+        if scores:
+            # Use average score of genes in BP
+            avg_score = np.mean(scores)
             
-            # Process BP name for better readability
-            processed_name = process_bp_name(data['name'])
+            # Assign to latent factor based on GO term level (simplified)
+            latent_factor = bp_info.get('level', 0) % 5  # Use 5 latent factors for demo
             
-            # Use the processed name in the scores
-            if processed_name in bp_scores:
-                # If the same processed name exists, keep the higher score
-                if score > bp_scores[processed_name]:
-                    bp_scores[processed_name] = score
-            else:
-                bp_scores[processed_name] = score
+            bp_data[bp_name] = {
+                'bp_count': float(avg_score),
+                'latent_factor': int(latent_factor),
+                'gene_count': len(scores)
+            }
     
-    # Print debug information
-    print("\n=== Debug Information ===")
-    print(f"Total genes across all BPs: {total_genes_in_bp}")
-    print(f"BPs with enough genes (≥{min_genes}): {bps_with_enough_genes}")
-    print(f"Unique BP names after processing: {len(bp_scores)}")
+    # Sort BPs by score in descending order
+    sorted_bps = sorted(bp_data.items(), key=lambda x: x[1]['bp_count'], reverse=True)
     
-    if not bp_scores and filtered_bp:
+    print("\nTop 10 Biological Processes by Score:")
+    for bp, data in sorted_bps[:10]:
+        print(f"{bp}: Score={data['bp_count']:.4f}, LF={data['latent_factor']}, Genes={data['gene_count']}")
+    
+    # Convert to dict and add metadata
+    result = {
+        'bp_data': dict(sorted_bps),
+        'metadata': {
+            'total_bps': len(sorted_bps),
+            'latent_factors': len(set(data['latent_factor'] for _, data in sorted_bps)),
+            'min_genes': min_genes,
+            'max_genes': max_genes
+        }
+    }
+    
+    return result
         print("\n=== Potential Issues ===")
         print("No BPs met the criteria. Try the following:")
         print(f"1. Check if gene IDs in your model match those in the GO annotations")
@@ -351,25 +374,44 @@ def main():
         # Extract gene scores from model
         gene_scores = extract_gene_scores(model_path)
         
-        # Map genes to filtered biological processes
-        print("\nMapping genes to biological processes...")
-        bp_scores = map_genes_to_bp(
-            gene_scores, 
-            gene_to_go, 
-            godag,
-            go2genes,
-            min_genes=5,    # Minimum genes per BP
-            max_genes=30    # Maximum genes per BP
+        # Map gene scores to BP scores with latent factors
+        print("\n=== Mapping gene scores to biological processes with latent factors ===")
+        result = map_genes_to_bp(
+            gene_scores=gene_scores,
+            gene_to_go=gene_to_go,
+            godag=godag,
+            go2genes=go2genes,
+            min_genes=5,
+            max_genes=30
         )
         
-        if not bp_scores:
+        if not result or 'bp_data' not in result or not result['bp_data']:
             print("No biological processes found with the given criteria.")
-            print("Try adjusting the min_genes and max_genes parameters.")
             return
-            
-        # Generate and save enhanced word cloud
-        print(f"\nGenerating enhanced word cloud in {OUTPUT_DIR}...")
-        generate_enhanced_wordcloud(bp_scores, output_file)
+        
+        # Save BP scores with latent factors to JSON
+        output_file = OUTPUT_DIR / 'bp_scores.json'
+        with open(output_file, 'w') as f:
+            json.dump(result, f, indent=2)
+        print(f"\nBP scores with latent factors saved to {output_file}")
+        
+        # Print summary
+        metadata = result.get('metadata', {})
+        print(f"\n=== Summary ===")
+        print(f"Total BPs: {metadata.get('total_bps', 0)}")
+        print(f"Latent factors: {metadata.get('latent_factors', 0)}")
+        print(f"Gene count range: {metadata.get('min_genes', 'N/A')}-{metadata.get('max_genes', 'N/A')}")
+        
+        # Generate word cloud for each latent factor
+        print("\n=== Generating word clouds ===")
+        output_img = OUTPUT_DIR / 'bp_wordcloud.png'
+        
+        # For now, generate a single word cloud with all BPs
+        # The enhanced_wordcloud.py will handle the latent factor visualization
+        generate_enhanced_wordcloud(
+            {bp: data['bp_count'] for bp, data in result['bp_data'].items()}, 
+            str(output_img)
+        )
         
         print("\nDone! Check the visualization_output directory for the word cloud and data.")
         

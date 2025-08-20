@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 from wordcloud import WordCloud, get_single_color_func
 import matplotlib.patches as patches
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -106,11 +107,26 @@ def draw_curved_arrow(ax, start, end, color='#444444', width=1.0, alpha=0.9):
 
 def create_visualization(
     data: Dict[str, List[str]],
-    connections: List[Tuple[str, str, float]],
+    connections: List[Tuple[str, str, float]] = None,
     output_path: str = 'enhanced_wordcloud.png',
     size: int = 800,
-    dpi: int = 300
+    dpi: int = 300,
+    min_font_size: int = 8,
+    max_font_size: int = 100
 ):
+    # Initialize connections if None
+    if connections is None:
+        connections = []
+    
+    # Validate connections format
+    if connections and not all(isinstance(conn, (list, tuple)) and len(conn) == 3 
+                             and isinstance(conn[0], str) and isinstance(conn[1], str) 
+                             and isinstance(conn[2], (int, float)) for conn in connections):
+        import warnings
+        warnings.warn("Invalid connections format. Expected List[Tuple[str, str, float]]. Ignoring connections.")
+        connections = []
+    # Initialize node_positions dictionary to store node positions and information
+    node_positions = {}
     """
     Create an enhanced word cloud visualization with connections
     
@@ -132,7 +148,7 @@ def create_visualization(
     ]
     # Store color with node info for consistency
     
-    # Generate word clouds and store their positions
+    # Initialize node_positions and wordclouds dictionaries
     node_positions = {}
     wordclouds = {}
     
@@ -225,12 +241,12 @@ def create_visualization(
             max_font_size=max_font_size,
             frequencies=frequencies
         )
-        plt.figure(figsize=(size/100, size/100), dpi=dpi)
-        plt.imshow(wc, interpolation='bilinear')
-        plt.axis('off')
+        # Use the existing ax instead of creating a new figure
+        ax.imshow(wc, interpolation='bilinear')
+        ax.axis('off')
         plt.tight_layout(pad=0)
-        plt.savefig(output_path, dpi=dpi, bbox_inches='tight', pad_inches=0)
-        plt.close()
+        plt.savefig(output_path, dpi=dpi, bbox_inches='tight', pad_inches=0, facecolor='white')
+        plt.close(fig)
         print(f"Word cloud saved to {os.path.abspath(output_path)}")
         return
     
@@ -287,59 +303,19 @@ def create_visualization(
                 ha='center', va='top', fontsize=10, 
                 bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=2))
     
-    # Save the final figure
-    plt.tight_layout(pad=0)
-    plt.savefig(output_path, dpi=dpi, bbox_inches='tight', pad_inches=0)
-    plt.close()
-    print(f"Word cloud saved to {os.path.abspath(output_path)}")
-    return
-        
-        # Get the most frequent color from the word cloud (excluding background)
-        wc_array = wc.to_array()
-        # Flatten the array and remove white background pixels
-        pixels = wc_array.reshape(-1, 3)
-        pixels = pixels[~np.all(pixels == 255, axis=1)]  # Remove white pixels
-        if len(pixels) > 0:
-            # Find the most common color
-            unique_colors, counts = np.unique(pixels, axis=0, return_counts=True)
-            dominant_color = unique_colors[np.argmax(counts)]
-            # Convert to hex
-            node_color = '#%02x%02x%02x' % tuple(dominant_color)
-        else:
-            # Fallback to default color if no colors found
-            node_color = '#1f77b4'
-            
-        # Update node info with the extracted color
-        node_info['color'] = node_color
-        wordclouds[node] = (wc, wc_size)  # Store both wordcloud and its size
-        
-        # Add node circle with size based on BP count (drawn first, behind everything)
-        circle_diameter = all_bp_sizes[i]
-        circle_radius = circle_diameter / 2
-        
-        # Create a perfect circle with the scaled size and subtle glow effect
-        circle = Circle(
-            (x, y), 
-            radius=circle_radius,
-            facecolor=colors[i % len(colors)],
-            alpha=0.2,  # More subtle fill
-            zorder=1,
-            linewidth=1.5,
-            edgecolor=colors[i % len(colors)],
-            linestyle='-',
-            antialiased=True
-        )
-        ax.add_patch(circle)
-        
-        # Store node position and size for later label placement
-        node_info = {
-            'x': x,
-            'y': y,
-            'radius': circle_radius,
-            'color': colors[i % len(colors)],
-            'label': str(node).replace('LF_', '')  # Remove 'LF_' prefix if present
-        }
-        node_positions[node] = (x, y, node_info)
+    # Create and add the circle patch
+    circle = Circle((x, y), radius=lf_size/2, facecolor='none', edgecolor='gray', alpha=0.5, linewidth=1)
+    ax.add_patch(circle)
+    
+    # Store node position and size for later label placement
+    node_info = {
+        'x': x,
+        'y': y,
+        'radius': lf_size/2,
+        'color': colors[i % len(colors)],
+        'label': str(node).replace('LF_', '')  # Remove 'LF_' prefix if present
+    }
+    node_positions[node] = (x, y, node_info)
     
     # Add word clouds with higher zorder to be on top of circles
     for i, (node, (x, y, node_info)) in enumerate(node_positions.items()):
@@ -366,7 +342,14 @@ def create_visualization(
                    color='#111111',  # Darker gray for better contrast
                    fontproperties=font,
                    zorder=5)
+            
             img = wc.to_array()
+    
+    # Save the final figure after all elements are added
+    plt.tight_layout(pad=0)
+    plt.savefig(output_path, dpi=dpi, bbox_inches='tight', pad_inches=0)
+    plt.close()
+    print(f"Word cloud saved to {os.path.abspath(output_path)}")
             
             # Calculate zoom factor with better scaling for the available space
             # Base zoom is higher to fill more space
@@ -389,51 +372,77 @@ def create_visualization(
     
     # No legend - removed per user request
     
-    # Draw connections between nodes with arrowheads
-    for src, tgt, weight in connections:
-        if src in node_positions and tgt in node_positions:
-            # Extract positions from node_info
-            start_x, start_y, _ = node_positions[src]
-            end_x, end_y, _ = node_positions[tgt]
-            
-            start = (start_x, start_y)
-            end = (end_x, end_y)
-            
-            # Calculate direction vector
-            direction = np.array(end) - np.array(start)
-            distance = np.linalg.norm(direction)
-            if distance > 0:
+    # Draw connections between nodes with arrowheads if connections exist
+    if connections and len(connections) > 0:  # Only process if we have valid connections
+        print(f"Processing {len(connections)} connections between nodes...")
+        for i, conn in enumerate(connections):
+            try:
+                if len(conn) != 3:
+                    print(f"Warning: Invalid connection format at index {i}: {conn}. Expected (source, target, weight).")
+                    continue
+                    
+                src, tgt, weight = conn
+                if not (isinstance(src, str) and isinstance(tgt, str) and isinstance(weight, (int, float))):
+                    print(f"Warning: Invalid connection types at index {i}: {conn}. Expected (str, str, number).")
+                    continue
+                    
+                if src not in node_positions:
+                    print(f"Warning: Source node '{src}' not found in node positions.")
+                    continue
+                    
+                if tgt not in node_positions:
+                    print(f"Warning: Target node '{tgt}' not found in node positions.")
+                    continue
+                # Extract positions from node_info
+                # Get node positions and biological metadata
+                start_x, start_y, src_info = node_positions[src]
+                end_x, end_y, tgt_info = node_positions[tgt]
+                
+                # Create position vectors
+                start = np.array([start_x, start_y])
+                end = np.array([end_x, end_y])
+                
+                # Calculate direction and normalize
+                direction = end - start
+                distance = np.linalg.norm(direction)
+                if distance <= 0:
+                    continue  # Skip self-loops or invalid distances
+                    
                 direction = direction / distance
                 
-                # Get source and target info with word cloud sizes
-                src_info = node_positions[src][2]
-                tgt_info = node_positions[tgt][2]
+                # Get word cloud or node radii with biological context
+                src_radius = wordclouds[src][1] // 2 if src in wordclouds else src_info.get('radius', 10)
+                tgt_radius = wordclouds[tgt][1] // 2 if tgt in wordclouds else tgt_info.get('radius', 10)
                 
-                # Calculate exact edge points at word cloud boundaries
-                src_wc_radius = wordclouds[src][1] // 2 if src in wordclouds else src_info['radius']
-                tgt_wc_radius = wordclouds[tgt][1] // 2 if tgt in wordclouds else tgt_info['radius']
+                # Calculate connection points at the boundaries of the biological processes
+                start_point = start + direction * (src_radius * 0.9)  # Start from source boundary
+                end_point = end - direction * (tgt_radius * 0.9)     # End at target boundary
                 
-                # Calculate edge points starting and ending at word cloud edges
-                start = np.array(start) + direction * (src_wc_radius * 0.95)  # Start from source edge
-                end = np.array(end) - direction * (tgt_wc_radius * 0.95)  # End at target edge
+                # Adjust arrow properties based on biological interaction strength
+                arrow_width = 0.5 + weight * 3  # Scale width with interaction strength
+                arrow_alpha = 0.5 + weight * 0.5  # Scale opacity with interaction strength
                 
-                # Draw arrow with weight-based width
+                # Draw curved arrow to represent biological pathway
                 draw_curved_arrow(
                     ax,
-                    tuple(start),
-                    tuple(end),
-                    color='gray',
-                    width=0.5 + weight * 2,  # Scale width with weight
-                    alpha=0.6
+                    tuple(start_point),
+                    tuple(end_point),
+                    color='#2e7d32' if weight > 0.5 else '#0288d1',  # Green for strong, blue for weak interactions
+                    width=arrow_width,
+                    alpha=arrow_alpha,
+                    arrowstyle='-|>',  # Solid arrowhead
+                    connectionstyle=f'arc3,rad={0.2 if weight > 0.5 else 0.1}'  # More curve for stronger interactions
                 )
     
     
     
-    # Set axis limits and remove ticks
+    # Configure plot with biological context
     ax.set_xlim(0, size)
     ax.set_ylim(0, size)
     ax.set_xticks([])
     ax.set_yticks([])
+    ax.set_facecolor('#f5f5f5')  # Light gray background for better contrast
+    ax.set_aspect('equal')  # Maintain aspect ratio for accurate spatial relationships
     
     # Add title and legend
     plt.title('Enhanced Word Cloud Network', fontsize=16, pad=20)
@@ -538,6 +547,9 @@ def load_example_data() -> Tuple[Dict, List]:
 def main():
     """Main function to run the visualization"""
     import argparse
+    
+    # Initialize connections as empty list by default
+    connections = []
     
     parser = argparse.ArgumentParser(description='Generate enhanced word cloud visualization')
     parser.add_argument('bp_scores', type=str, nargs='?', default=None,
