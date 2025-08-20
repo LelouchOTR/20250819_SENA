@@ -15,9 +15,12 @@ def download_file(url, output_path):
         return False
 
 def main():
-    # Create data directory if it doesn't exist
-    data_dir = Path('data')
+    # Create datasets directory if it doesn't exist
+    data_dir = Path('datasets')
     data_dir.mkdir(exist_ok=True)
+    
+    # Also create data directory for backward compatibility
+    Path('data').mkdir(exist_ok=True)
     
     # Download GO OBO file
     go_obo_url = "http://current.geneontology.org/ontology/go-basic.obo"
@@ -31,6 +34,16 @@ def main():
     gene2go_url = "https://ftp.ncbi.nih.gov/gene/DATA/gene2go.gz"
     gene2go_gz_path = data_dir / 'gene2go.gz'
     gene2go_path = data_dir / 'gene2go'
+    
+    # Create symlinks in the data directory for backward compatibility
+    try:
+        if not (Path('data') / 'go-basic.obo').exists() and go_obo_path.exists():
+            (Path('data') / 'go-basic.obo').symlink_to(go_obo_path.absolute())
+        if not (Path('data') / 'gene2go').exists() and gene2go_path.exists():
+            (Path('data') / 'gene2go').symlink_to(gene2go_path.absolute())
+    except Exception as e:
+        print(f"Note: Could not create symlinks in data directory: {e}")
+        print("The script will continue, but some tools might expect files in the data/ directory.")
     
     if not gene2go_path.exists():
         if gene2go_gz_path.exists() or download_file(gene2go_url, str(gene2go_gz_path)):

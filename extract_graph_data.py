@@ -76,15 +76,21 @@ def extract_graph_data(model_name: str = "example") -> None:
     print(f"Saved causal graph adjacency matrix to A.npy with shape {causal_graph.shape}")
 
     # Load Norman2019 dataset
-    norman_path = Path('data') / 'Norman2019_raw.h5ad'
+    norman_path = Path('datasets') / 'Norman2019_raw.h5ad'
     if not norman_path.exists():
-        # Fall back to reduced dataset if raw is not available
-        norman_path = Path('data') / 'Norman2019_reduced.h5ad'
+        # Fall back to data directory for backward compatibility
+        norman_path = Path('data') / 'Norman2019_raw.h5ad'
         if not norman_path.exists():
-            raise FileNotFoundError(
-                f"Could not find Norman2019 dataset. "
-                f"Expected either {Path('data')/'Norman2019_raw.h5ad'} or {Path('data')/'Norman2019_reduced.h5ad'}"
-            )
+            # Fall back to reduced dataset if raw is not available
+            norman_path = Path('data') / 'Norman2019_reduced.h5ad'
+            if not norman_path.exists():
+                raise FileNotFoundError(
+                    f"Could not find Norman2019 dataset. "
+                    f"Expected one of:\n"
+                    f"- {Path('datasets')/'Norman2019_raw.h5ad'}\n"
+                    f"- {Path('data')/'Norman2019_raw.h5ad'}\n"
+                    f"- {Path('data')/'Norman2019_reduced.h5ad'}"
+                )
     
     print(f"Loading dataset from {norman_path}")
     adata = sc.read_h5ad(norman_path)
@@ -180,7 +186,8 @@ def extract_graph_data(model_name: str = "example") -> None:
         json.dump(connections, f, indent=2)
     
     print("\nTop GO term biological processes:")
-        bp_list = bp_full_lists[i]
+    for i, go_term in enumerate(top_gos):
+        bp_list = bp_full_lists.get(i, [])
         print(f"Latent factor {i} ({go_term}): {len(bp_list)} biological processes")
         for bp in bp_list[:10]:  # Show first 10 processes
             print(f"  - {bp}")
@@ -252,10 +259,16 @@ def extract_graph_data(model_name="example"):
     print(f"Saved causal graph adjacency matrix to A.npy with shape {causal_graph.shape}")
 
     # Load GO term to gene mappings
-    go_gene_df = pd.read_csv('data/go_kegg_gene_map.tsv', sep='\t')
+    go_kegg_path = Path('data') / 'go_kegg_gene_map.tsv'
+    if not go_kegg_path.exists():
+        go_kegg_path = Path('datasets') / 'go_kegg_gene_map.tsv'
+    go_gene_df = pd.read_csv(go_kegg_path, sep='\t')
     
     # Load gene name mappings
-    gene_name_df = pd.read_csv('data/ensembl_genename_mapping.tsv', sep='\t')
+    genemap_path = Path('data') / 'ensembl_genename_mapping.tsv'
+    if not genemap_path.exists():
+        genemap_path = Path('datasets') / 'ensembl_genename_mapping.tsv'
+    gene_name_df = pd.read_csv(genemap_path, sep='\t')
     ensembl_to_gene_name = dict(zip(gene_name_df['ensembl_gene_id'], gene_name_df['external_gene_name']))
 
     # Get GO terms from the model data (these are the latent factors)
