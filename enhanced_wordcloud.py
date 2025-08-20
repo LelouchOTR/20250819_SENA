@@ -331,13 +331,6 @@ def create_visualization(
                           fill=False, color='#888888', 
                           alpha=0.5, linewidth=1, zorder=3)
         ax.add_patch(circle)
-                y - wc_size//2, 
-                y + wc_size//2
-            ), 
-            aspect='auto', 
-            zorder=2,
-            interpolation='bilinear'
-        )
         
         # Add latent factor label with colored background
         lf_label = f"LF {lf}"
