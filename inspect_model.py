@@ -27,11 +27,19 @@ def main():
                 if not key.startswith('_'):  # Skip private attributes
                     print(f"- {key}: {type(value)}")
         
-        # If model has state_dict, show its keys
+        # If model has state_dict, show its keys and shapes
         if hasattr(model, 'state_dict'):
-            print("\nModel state_dict keys:")
-            for key in model.state_dict().keys():
-                print(f"- {key}")
+            print("\nModel state_dict keys and shapes:")
+            for key, tensor in model.state_dict().items():
+                if hasattr(tensor, 'shape'):
+                    print(f"- {key}: {tuple(tensor.shape)}")
+                    # Look for potential graph-like structures (square matrices)
+                    if len(tensor.shape) == 2 and tensor.shape[0] == tensor.shape[1]:
+                        print(f"  - Found square matrix of size {tensor.shape[0]}x{tensor.shape[1]}")
+                        print(f"  - Non-zero elements: {(tensor != 0).sum().item()}")
+                        print(f"  - Is symmetric: {torch.allclose(tensor, tensor.T) if tensor.shape[0] == tensor.shape[1] else 'N/A'}")
+                else:
+                    print(f"- {key}: {type(tensor).__name__}")
         
         # If model is a tuple, examine its elements
         elif isinstance(model, tuple):
