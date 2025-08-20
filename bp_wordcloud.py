@@ -5,8 +5,6 @@ import pandas as pd
 from pathlib import Path
 from goatools.obo_parser import GODag
 from goatools.associations import read_ncbi_gene2go
-from goatools.associations import dnld_ncbi_associations
-from goatools.obo_parser import GODag
 from goatools.gosubdag.gosubdag import GoSubDag
 from goatools.gosubdag.rpt.write_hierarchy import WrHierGO
 from collections import defaultdict, Counter
