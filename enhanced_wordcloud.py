@@ -236,8 +236,8 @@ def create_visualization(
         
     center = size // 2
     # Increase radius and add dynamic spacing based on number of factors
-    base_radius = size * 0.4
-    radius = base_radius + (n * 10)  # Increase radius based on number of factors
+    base_radius = size * 0.3  # Reduced base radius
+    radius = base_radius + (n * 15)  # More spacing between circles
     
     # Sort latent factors by total score
     sorted_lfs = sorted(latent_factors.items(), 
@@ -258,8 +258,8 @@ def create_visualization(
     
     # Create a circular mask for word clouds
     def create_circular_mask(h, w, center=None, radius=None):
-        # Create a blank image with white background
-        mask = 255 * np.ones((h, w), dtype=np.uint8)
+        # Create a blank image with black background (0)
+        mask = np.zeros((h, w), dtype=np.uint8)
         
         # Create coordinates grid
         y, x = np.ogrid[:h, :w]
@@ -269,10 +269,10 @@ def create_visualization(
             center = (w//2, h//2)
         if radius is None:
             radius = min(center[0], center[1], w-center[0], h-center[1])
-            
-        # Create circular mask (0 for outside, 255 for inside)
+        
+        # Create circular mask (255 for inside, 0 for outside)
         mask_area = (x - center[0])**2 + (y - center[1])**2 <= radius**2
-        mask[~mask_area] = 0
+        mask[mask_area] = 255
         
         return mask
     
@@ -322,9 +322,9 @@ def create_visualization(
             repeat=False
         ).generate_from_frequencies(frequencies)
         
-        # Calculate size based on total score
+        # Calculate size based on total score (reduced size)
         total_score = sum(score for _, score in bps)
-        wc_size = min(500, 200 + int(total_score * 50))  # Scale size based on total score
+        wc_size = min(300, 150 + int(total_score * 30))  # Reduced base size and scaling
         
         # Calculate position and size for the word cloud
         wc_ratio = wc.height / wc.width
@@ -350,8 +350,9 @@ def create_visualization(
         
         # Add a subtle circular border
         circle = plt.Circle((x, y), wc_width/2 * 0.95,  # Slightly smaller than word cloud
-                          fill=False, color='#888888',
-                          alpha=0.5, linewidth=1, zorder=3)
+                          fill=False, color='#2C3E50',  # Darker border
+                          alpha=0.8, linewidth=2, zorder=3,  # Thicker border
+                          linestyle='-')
         ax.add_patch(circle)
         
         # Add latent factor label with colored background
@@ -378,14 +379,17 @@ def create_visualization(
                         end_x = x2 - (dx/dist) * r2
                         end_y = y2 - (dy/dist) * r2
                         
-                        # Draw arrow with weight-based width
-                        arrow_width = 0.5 + weight * 2  # Scale width by weight
+                        # Draw arrow with weight-based width and better visibility
+                        arrow_width = 1.0 + weight * 3  # Thicker arrows
+                        arrow_alpha = 0.9  # More opaque
                         draw_curved_arrow(ax, 
                                         (start_x, start_y), 
                                         (end_x, end_y),
-                                        color='#666666',
+                                        color='#E74C3C',  # Brighter color
                                         width=arrow_width,
-                                        alpha=0.7)  # Slightly transparent
+                                        alpha=arrow_alpha,
+                                        head_width=20,  # Larger arrow head
+                                        head_length=25)
         
         # Add label
         ax.text(
