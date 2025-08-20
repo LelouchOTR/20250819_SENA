@@ -364,6 +364,64 @@ def create_visualization(
     plt.close()
     print(f"Visualization saved to {output_path}")
 
+def load_bp_scores(bp_scores_file: str) -> Dict[str, float]:
+    """Load biological process scores from JSON file"""
+    try:
+        with open(bp_scores_file, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading BP scores: {e}")
+        return {"Cell Cycle": 1.0, "Signal Transduction": 0.9, "Metabolic Process": 0.8}
+
+def load_visualization_data(data_dir='visualization_output'):
+    """
+    Load visualization data from JSON files or BP scores
+    
+    Returns:
+        tuple: (nodes_dict, connections_list) where nodes_dict is a dictionary
+        with BP names as keys and their scores as values,
+        and connections_list is an empty list (not used for BP word cloud)
+    """
+    # First try to load BP scores
+    bp_scores_path = os.path.join(data_dir, 'bp_scores.json')
+    if os.path.exists(bp_scores_path):
+        bp_scores = load_bp_scores(bp_scores_path)
+        # Convert to nodes format expected by visualization
+        nodes_dict = {bp: {'score': score} for bp, score in bp_scores.items()}
+        return nodes_dict, []
+    
+    # Fall back to original node/connection format
+    try:
+        # Load nodes data
+        nodes_path = os.path.join(data_dir, 'nodes.json')
+        with open(nodes_path, 'r') as f:
+            nodes_data = json.load(f)
+            
+        # Load connections data if it exists
+        connections_path = os.path.join(data_dir, 'connections.json')
+        connections_list = []
+        if os.path.exists(connections_path):
+            with open(connections_path, 'r') as f:
+                connections_list = json.load(f)
+        
+        # Convert nodes to the expected format
+        nodes_dict = {}
+        for node in nodes_data:
+            node_id = node.get('id', '')
+            if node_id:  # Only process if we have an ID
+                nodes_dict[node_id] = {
+                    'terms': node.get('terms', []),
+                    'bp_count': node.get('bp_count', 0),
+                    'score': node.get('score', 0)
+                }
+        
+        return nodes_dict, connections_list
+        
+    except Exception as e:
+        print(f"Error loading visualization data: {e}")
+        print("Generating sample data...")
+        return load_example_data()
+
 def load_example_data() -> Tuple[Dict, List]:
     """Load example data for demonstration"""
     # Example biological processes and their terms
@@ -393,73 +451,18 @@ def load_example_data() -> Tuple[Dict, List]:
         ('Cell Cycle', 'Signaling', 0.8),
         ('Signaling', 'Metabolism', 0.6),
         ('Metabolism', 'Cell Cycle', 0.7),
-        ('Cell Cycle', 'Metabolism', 0.5)
-    ]
-    
-    return data, connections
-
-def load_visualization_data(data_dir='output'):
-    """
-    Load visualization data from JSON files
-    
-    Returns:
-        tuple: (nodes_dict, connections_list) where nodes_dict is a dictionary
-        with node names as keys and a dictionary of {'terms': list, 'bp_count': int} as values,
-        and connections_list is a list of (source, target, weight) tuples
-    """
-    # Load nodes data
-    nodes_path = os.path.join(data_dir, 'nodes.json')
-    connections_path = os.path.join(data_dir, 'connections.json')
-    
-    if not os.path.exists(nodes_path) or not os.path.exists(connections_path):
-        raise FileNotFoundError(
-            f"Required files not found in {data_dir}. "
-            f"Make sure to run extract_graph_data.py first."
-        )
-    
-    with open(nodes_path, 'r') as f:
-        nodes = json.load(f)
-    
-    # Ensure nodes have the expected structure
-    for node_name, node_data in nodes.items():
-        if isinstance(node_data, list):
-            # Convert old format to new format
-            nodes[node_name] = {
-                'terms': node_data,
-                'bp_count': len(node_data)
-            }
-    
-    # Load connections data
-    with open(connections_path, 'r') as f:
-        connections_data = json.load(f)
-    
-    # Convert connections to the expected format
-    connections = [(c['source'], c['target'], c['weight']) 
-                  for c in connections_data]
-    
-    print(f"Loaded {len(nodes)} nodes and {len(connections)} connections")
-    
-    # Print node information for debugging
-    print("\nNode information:")
-    for i, (node_name, node_data) in enumerate(nodes.items()):
-        bp_count = node_data.get('bp_count', len(node_data.get('terms', [])))
-        print(f"{node_name}: {bp_count} biological processes")
-    
-    return nodes, connections
 
 def main():
+    """Main function to run the visualization"""
     import argparse
     
-    # Parse command line arguments
     parser = argparse.ArgumentParser(description='Generate enhanced word cloud visualization')
-    parser.add_argument('--data-dir', type=str, default='output',
-                       help='Directory containing nodes.json and connections.json')
+    parser.add_argument('bp_scores', type=str, nargs='?', default=None,
+                       help='Path to BP scores JSON file (output from bp_wordcloud.py)')
     parser.add_argument('--output', type=str, default='enhanced_wordcloud.png',
                        help='Output file path for the visualization')
-    parser.add_argument('--size', type=int, default=2000,
-                       help='Size of the output image (pixels)')
-    parser.add_argument('--dpi', type=int, default=300,
-                       help='DPI of the output image')
+    parser.add_argument('--data-dir', type=str, default='visualization_output',
+                       help='Directory containing visualization data (fallback if bp_scores not provided)')
     
     args = parser.parse_args()
     
@@ -467,8 +470,33 @@ def main():
     output_dir = os.path.dirname(os.path.abspath(args.output))
     os.makedirs(output_dir, exist_ok=True)
     
-    try:
-        # Load visualization data
+    # Load data
+    if args.bp_scores and os.path.exists(args.bp_scores):
+        # Use specified BP scores file
+        bp_scores = load_bp_scores(args.bp_scores)
+        nodes = {bp: {'score': score} for bp, score in bp_scores.items()}
+        connections = []
+    else:
+        # Fall back to data directory
+        print(f"Loading visualization data from {args.data_dir}")
+        nodes, connections = load_visualization_data(args.data_dir)
+    
+    if not nodes:
+        print("No data to visualize. Exiting.")
+        return
+    
+    print(f"Found {len(nodes)} biological processes to visualize")
+    
+    # Create visualization
+    create_visualization(
+        nodes=nodes,
+        connections=connections,
+        output_file=args.output,
+        title="Biological Process Word Cloud"
+    )
+    # Create output directory if it doesn't exist
+    output_dir = os.path.dirname(os.path.abspath(args.output))
+    os.makedirs(output_dir, exist_ok=True)
         print(f"Loading visualization data from {args.data_dir}")
         nodes, connections = load_visualization_data(args.data_dir)
         
