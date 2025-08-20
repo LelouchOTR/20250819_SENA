@@ -356,18 +356,14 @@ def extract_graph_data(model_name="example"):
     ensembl_to_gene_name = dict(zip(gene_name_df['ensembl_gene_id'], gene_name_df['external_gene_name']))
 
     # Get GO terms from the model data (these are the latent factors)
-    if isinstance(data['fc1'], (list, tuple)):
-        gos = list(data['fc1'])
-    elif hasattr(data['fc1'], 'columns'):
-        gos = list(data['fc1'].columns)
+    if hasattr(data['fc1'], 'columns'):
+        gos = data['fc1'].columns.tolist()
     elif hasattr(data['fc1'], '__iter__') and not isinstance(data['fc1'], str):
         gos = list(data['fc1'])
     else:
         # If we can't determine the GO terms, generate some mock ones
         num_nodes = data['causal_graph'].shape[0]
         gos = [f'GO:{i:07d}' for i in range(num_nodes)]
-    
-    print(f"Using {len(gos)} GO terms for visualization")
     
     # Calculate importance scores for each GO term
     go_importance = np.sum(np.abs(causal_graph), axis=0) + np.sum(np.abs(causal_graph), axis=1)
