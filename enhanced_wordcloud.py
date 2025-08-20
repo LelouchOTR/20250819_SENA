@@ -490,33 +490,22 @@ def main():
     
     print(f"Found {len(nodes)} biological processes to visualize")
     
-    # Create visualization
-    create_visualization(
-        nodes=nodes,
-        connections=connections,
-        output_file=args.output,
-        title="Biological Process Word Cloud"
-    )
     # Create output directory if it doesn't exist
     output_dir = os.path.dirname(os.path.abspath(args.output))
     os.makedirs(output_dir, exist_ok=True)
-        print(f"Loading visualization data from {args.data_dir}")
-        nodes, connections = load_visualization_data(args.data_dir)
-        
-        print(f"Found {len(nodes)} nodes and {len(connections)} connections")
-        
-        # Generate the visualization
-        print("Generating visualization...")
-        create_visualization(
-            data=nodes,
-            connections=connections,
-            output_path=args.output,
-            size=args.size,
-            dpi=args.dpi
-        )
-        
-        print(f"Visualization saved to {os.path.abspath(args.output)}")
-        
+    
+    # Create visualization
+    print("Generating visualization...")
+    create_visualization(
+        data=nodes,
+        connections=connections,
+        output_path=args.output,
+        size=args.size,
+        dpi=args.dpi
+    )
+    
+    print(f"Visualization saved to {os.path.abspath(args.output)}")
+    
     except Exception as e:
         print(f"Error generating visualization: {str(e)}")
         raise
