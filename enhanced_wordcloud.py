@@ -226,9 +226,6 @@ def create_visualization(
     # Store positions for arrow connections
     lf_positions = {}
     
-    # Generate distinct colors for each latent factor
-    colors = plt.cm.get_cmap('tab20', len(sorted_lfs))
-    
     log_memory_usage("After sorting and preparing colors")
     
     # Calculate scaling factors based on number of biological processes
@@ -436,13 +433,13 @@ def create_visualization(
             interpolation='bilinear'
         )
         
-        # Add latent factor label with colored background
+        # Add latent factor label with grayscale background
         lf_label = f"LF {lf}"
         # Label LF 0 as "Unassigned"
         if lf == 0:
             lf_label = "Unassigned"
         
-        # Add label
+        # Add label with grayscale background
         ax.text(
             x, 
             y - wc_size//2 - 15,  # Position above the word cloud
@@ -453,7 +450,7 @@ def create_visualization(
             fontweight='normal',
             fontfamily='Arial',
             bbox=dict(
-                facecolor=colors(i), 
+                facecolor='lightgray', 
                 alpha=0.8, 
                 edgecolor='none', 
                 boxstyle='round,pad=0.5'
@@ -475,28 +472,6 @@ def create_visualization(
               pad=20, 
               fontweight='normal',
               fontfamily='Arial')
-    
-    # Add legend for latent factors
-    legend_elements = [
-        plt.Line2D(
-            [0], [0], 
-            marker='o', 
-            color='w', 
-            label=f'LF {lf}{" (Unassigned)" if lf == 0 else ""}',
-            markerfacecolor=colors(i), 
-            markersize=15
-        )
-        for i, (lf, _) in enumerate(sorted_lfs)
-    ]
-    plt.legend(
-        handles=legend_elements, 
-        loc='upper center', 
-        bbox_to_anchor=(0.5, -0.05),
-        ncol=min(5, len(legend_elements)),
-        frameon=False,
-        fontsize=10,
-        prop={'family': 'Arial'}
-    )
     
     # Save the figure with optimized settings
     plt.tight_layout()
