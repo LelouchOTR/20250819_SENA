@@ -64,7 +64,7 @@ def create_circular_mask(size: int) -> np.ndarray:
     return mask
 
 
-def draw_curved_arrow(ax, start, end, color='#444444', width=1.0, alpha=0.9):
+def draw_curved_arrow(ax, start, end, color='#D3D3D3', width=1.0, alpha=0.7):
     """Draw a curved arrow between two points with precise edge targeting"""
     from matplotlib.patches import FancyArrowPatch
     
@@ -89,7 +89,7 @@ def draw_curved_arrow(ax, start, end, color='#444444', width=1.0, alpha=0.9):
         connectionstyle=f'arc3,rad={0.2}',
         shrinkA=0,  # No shrinking at start
         shrinkB=0,  # No shrinking at end - we'll handle this manually
-        zorder=4
+        zorder=1  # Place behind word clouds and labels
     )
     ax.add_patch(arrow)
 
@@ -227,6 +227,82 @@ def create_visualization(
     
     log_memory_usage("After sorting and preparing colors")
     
+    # Draw arrows first (behind everything else)
+    print(f"\n=== Arrow Drawing Debug Info ===")
+    print(f"Total connections provided: {len(connections)}")
+    if connections:
+        print("Connections data:")
+        for i, conn in enumerate(connections):
+            print(f"  {i+1}. {conn}")
+    
+    if connections:
+        # Create NetworkX DiGraph for better connection handling
+        G = nx.DiGraph()
+        for src, tgt, weight in connections:
+            G.add_edge(src, tgt, weight=weight)
+        
+        # Get edge weights and sort by strength
+        edges_with_weights = [(u, v, d['weight']) for u, v, d in G.edges(data=True)]
+        edges_with_weights.sort(key=lambda x: x[2], reverse=True)
+        
+        # Show all connections, not just top 10
+        top_connections = edges_with_weights
+        
+        print(f"Drawing {len(top_connections)} connections")
+        print("Connection details:")
+        
+        drawn_count = 0
+        for src, tgt, weight in top_connections:
+            print(f"  Processing connection: {src} -> {tgt} (weight: {weight:.4f})")
+            if str(src) in lf_positions and str(tgt) in lf_positions:
+                x1, y1, r1 = lf_positions[str(src)]
+                x2, y2, r2 = lf_positions[str(tgt)]
+                
+                # Calculate direction vector
+                dx = x2 - x1
+                dy = y2 - y1
+                dist = np.sqrt(dx*dx + dy*dy)
+                
+                print(f"    Position LF{src}: ({x1:.2f}, {y1:.2f}), radius: {r1:.2f}")
+                print(f"    Position LF{tgt}: ({x2:.2f}, {y2:.2f}), radius: {r2:.2f}")
+                print(f"    Distance between centers: {dist:.2f}")
+                
+                if dist > 0:  # Only draw if not the same point
+                    # Calculate start and end points on the circle edges
+                    start_x = x1 + (dx/dist) * r1
+                    start_y = y1 + (dy/dist) * r1
+                    end_x = x2 - (dx/dist) * r2
+                    end_y = y2 - (dy/dist) * r2
+                    
+                    print(f"    Arrow start: ({start_x:.2f}, {start_y:.2f})")
+                    print(f"    Arrow end: ({end_x:.2f}, {end_y:.2f})")
+                    
+                    # Draw arrow with weight-based width and better visibility
+                    arrow_width = max(0.5, 1.0 + weight * 3)  # Thicker arrows, minimum width
+                    arrow_alpha = 0.7  # More transparent
+                    print(f"    Arrow width: {arrow_width:.2f}, alpha: {arrow_alpha}")
+                    
+                    draw_curved_arrow(ax, 
+                                    (start_x, start_y), 
+                                    (end_x, end_y),
+                                    color='#D3D3D3',  # Light gray
+                                    width=arrow_width,
+                                    alpha=arrow_alpha)
+                    drawn_count += 1
+                else:
+                    print(f"    Skipping connection - same position")
+            else:
+                print(f"    Skipping connection - LF {src} or LF {tgt} not found in positions")
+                if str(src) not in lf_positions:
+                    print(f"      LF {src} missing from lf_positions")
+                if str(tgt) not in lf_positions:
+                    print(f"      LF {tgt} missing from lf_positions")
+        
+        print(f"Successfully drew {drawn_count} arrows")
+    else:
+        print("No connections to draw arrows for")
+    
+    # Draw word clouds and labels after arrows
     for i, (lf, bps) in enumerate(sorted_lfs):
         # Calculate position in circle
         angle = 2 * np.pi * i / n
@@ -319,83 +395,9 @@ def create_visualization(
                 alpha=0.8, 
                 edgecolor='none', 
                 boxstyle='round,pad=0.5'
-            )
+            ),
+            zorder=3  # Place in front of arrows
         )
-    
-    # Draw arrows for connections
-    print(f"\n=== Arrow Drawing Debug Info ===")
-    print(f"Total connections provided: {len(connections)}")
-    if connections:
-        print("Connections data:")
-        for i, conn in enumerate(connections):
-            print(f"  {i+1}. {conn}")
-    
-    if connections:
-        # Create NetworkX DiGraph for better connection handling
-        G = nx.DiGraph()
-        for src, tgt, weight in connections:
-            G.add_edge(src, tgt, weight=weight)
-        
-        # Get edge weights and sort by strength
-        edges_with_weights = [(u, v, d['weight']) for u, v, d in G.edges(data=True)]
-        edges_with_weights.sort(key=lambda x: x[2], reverse=True)
-        
-        # Show all connections, not just top 10
-        top_connections = edges_with_weights
-        
-        print(f"Drawing {len(top_connections)} connections")
-        print("Connection details:")
-        
-        drawn_count = 0
-        for src, tgt, weight in top_connections:
-            print(f"  Processing connection: {src} -> {tgt} (weight: {weight:.4f})")
-            if str(src) in lf_positions and str(tgt) in lf_positions:
-                x1, y1, r1 = lf_positions[str(src)]
-                x2, y2, r2 = lf_positions[str(tgt)]
-                
-                # Calculate direction vector
-                dx = x2 - x1
-                dy = y2 - y1
-                dist = np.sqrt(dx*dx + dy*dy)
-                
-                print(f"    Position LF{src}: ({x1:.2f}, {y1:.2f}), radius: {r1:.2f}")
-                print(f"    Position LF{tgt}: ({x2:.2f}, {y2:.2f}), radius: {r2:.2f}")
-                print(f"    Distance between centers: {dist:.2f}")
-                
-                if dist > 0:  # Only draw if not the same point
-                    # Calculate start and end points on the circle edges
-                    start_x = x1 + (dx/dist) * r1
-                    start_y = y1 + (dy/dist) * r1
-                    end_x = x2 - (dx/dist) * r2
-                    end_y = y2 - (dy/dist) * r2
-                    
-                    print(f"    Arrow start: ({start_x:.2f}, {start_y:.2f})")
-                    print(f"    Arrow end: ({end_x:.2f}, {end_y:.2f})")
-                    
-                    # Draw arrow with weight-based width and better visibility
-                    arrow_width = max(0.5, 1.0 + weight * 3)  # Thicker arrows, minimum width
-                    arrow_alpha = 0.9  # More opaque
-                    print(f"    Arrow width: {arrow_width:.2f}, alpha: {arrow_alpha}")
-                    
-                    draw_curved_arrow(ax, 
-                                    (start_x, start_y), 
-                                    (end_x, end_y),
-                                    color='#E74C3C',  # Brighter color
-                                    width=arrow_width,
-                                    alpha=arrow_alpha)
-                    drawn_count += 1
-                else:
-                    print(f"    Skipping connection - same position")
-            else:
-                print(f"    Skipping connection - LF {src} or LF {tgt} not found in positions")
-                if str(src) not in lf_positions:
-                    print(f"      LF {src} missing from lf_positions")
-                if str(tgt) not in lf_positions:
-                    print(f"      LF {tgt} missing from lf_positions")
-        
-        print(f"Successfully drew {drawn_count} arrows")
-    else:
-        print("No connections to draw arrows for")
     
     # Set plot limits and remove axes
     padding = size * 0.05  # 5% padding
