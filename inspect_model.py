@@ -42,14 +42,68 @@ def main():
                     print(f"- {key}: {type(tensor).__name__}")
         
         # If model is a tuple, examine its elements
-        elif isinstance(model, tuple):
+        if isinstance(model, tuple):
             print(f"\nModel is a tuple with {len(model)} elements")
-            for i, item in enumerate(model):
-                print(f"\nElement {i} type: {type(item)}")
-                if hasattr(item, '__dict__'):
-                    print(f"Element {i} attributes: {[a for a in dir(item) if not a.startswith('_')]}")
-                elif hasattr(item, 'keys'):
-                    print(f"Element {i} keys: {list(item.keys())}")
+            
+            # First element: Model state dict (OrderedDict)
+            if len(model) > 0 and hasattr(model[0], 'items'):
+                print("\n=== Element 0: Model State Dict ===")
+                print(f"Number of parameters: {len(model[0])}")
+                
+                # Print parameter shapes and look for potential graph structures
+                graph_like = []
+                for key, tensor in model[0].items():
+                    if hasattr(tensor, 'shape'):
+                        shape = tuple(tensor.shape)
+                        print(f"- {key}: {shape}")
+                        # Look for square matrices that could be graphs
+                        if len(shape) == 2 and shape[0] == shape[1]:
+                            print(f"  - Square matrix of size {shape[0]}x{shape[1]}")
+                            print(f"  - Non-zero elements: {(tensor != 0).sum().item()}")
+                            graph_like.append((key, tensor))
+                
+                if graph_like:
+                    print("\nPotential graph structures found:")
+                    for key, tensor in graph_like:
+                        print(f"- {key}: {tuple(tensor.shape)}")
+                else:
+                    print("\nNo obvious graph structures found in state dict.")
+            
+            # Second element: Configuration
+            if len(model) > 1 and isinstance(model[1], dict):
+                print("\n=== Element 1: Model Configuration ===")
+                config = model[1]
+                print("Configuration keys:")
+                for key in config.keys():
+                    print(f"- {key}: {type(config[key]).__name__}")
+                
+                # Print hyperparameters if they exist
+                if 'hparams' in config and isinstance(config['hparams'], dict):
+                    print("\nHyperparameters:")
+                    for k, v in config['hparams'].items():
+                        print(f"- {k}: {v}")
+            
+            # Third element: Training statistics
+            if len(model) > 2 and isinstance(model[2], dict):
+                print("\n=== Element 2: Training Statistics ===")
+                stats = model[2]
+                print("Available metrics:")
+                for key in stats.keys():
+                    print(f"- {key}")
+        
+        # For non-tuple models, try to find state_dict
+        elif hasattr(model, 'state_dict'):
+            print("\nModel state_dict keys and shapes:")
+            for key, tensor in model.state_dict().items():
+                if hasattr(tensor, 'shape'):
+                    print(f"- {key}: {tuple(tensor.shape)}")
+                    # Look for potential graph-like structures (square matrices)
+                    if len(tensor.shape) == 2 and tensor.shape[0] == tensor.shape[1]:
+                        print(f"  - Found square matrix of size {tensor.shape[0]}x{tensor.shape[1]}")
+                        print(f"  - Non-zero elements: {(tensor != 0).sum().item()}")
+                        print(f"  - Is symmetric: {torch.allclose(tensor, tensor.T)}")
+                else:
+                    print(f"- {key}: {type(tensor).__name__}")
                 
                 # Try to find something that looks like a causal graph
                 if hasattr(item, 'causal_graph'):
