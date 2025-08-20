@@ -450,7 +450,10 @@ def load_example_data() -> Tuple[Dict, List]:
     connections = [
         ('Cell Cycle', 'Signaling', 0.8),
         ('Signaling', 'Metabolism', 0.6),
-        ('Metabolism', 'Cell Cycle', 0.7),
+        ('Metabolism', 'Cell Cycle', 0.7)
+    ]
+    
+    return data, connections
 
 def main():
     """Main function to run the visualization"""
