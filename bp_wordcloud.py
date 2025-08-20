@@ -256,7 +256,7 @@ def map_genes_to_bp(gene_scores: Dict[str, float],
         }
     }
     
-    return result
+    if not sorted_bps:
         print("\n=== Potential Issues ===")
         print("No BPs met the criteria. Try the following:")
         print(f"1. Check if gene IDs in your model match those in the GO annotations")
@@ -268,6 +268,8 @@ def map_genes_to_bp(gene_scores: Dict[str, float],
             print("\nFirst 5 gene IDs from model:", list(gene_scores.keys())[:5])
         if gene_to_go:
             print("First 5 gene IDs from GO annotations:", list(gene_to_go.keys())[:5])
+    
+    return result
     
     return bp_scores
 
