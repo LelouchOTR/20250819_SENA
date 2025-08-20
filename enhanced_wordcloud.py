@@ -1,16 +1,37 @@
 import json
 import os
+import sys
+import tracemalloc
 from typing import Dict, List, Tuple
+from pympler import asizeof
+import psutil
+import gc
 
-import matplotlib.colors as mcolors
-import matplotlib.image as mpimg
-import matplotlib.patches as patches
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend to save memory
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import numpy as np
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-from matplotlib.patches import Circle
-from matplotlib.patches import FancyArrowPatch, Circle
-from wordcloud import WordCloud, get_single_color_func
+from wordcloud import WordCloud
+
+def log_memory_usage(label: str = ''):
+    """Log current memory usage"""
+    process = psutil.Process()
+    mem_info = process.memory_info()
+    print(f"{label} - Memory usage: RSS={mem_info.rss/1024/1024:.1f}MB, "
+          f"VMS={mem_info.vms/1024/1024:.1f}MB, "
+          f"Shared={mem_info.shared/1024/1024:.1f}MB")
+    
+    # Force garbage collection
+    gc.collect()
+    
+    # Get detailed memory info
+    if hasattr(psutil, 'Process'):
+        process = psutil.Process()
+        mem_info = process.memory_full_info()
+        print(f"Detailed memory - USS: {mem_info.uss/1024/1024:.1f}MB, "
+              f"PSS: {mem_info.pss/1024/1024:.1f}MB, "
+              f"Swap: {mem_info.swap/1024/1024:.1f}MB")
 
 
 class CustomWordCloud(WordCloud):
@@ -108,14 +129,65 @@ def draw_curved_arrow(ax, start, end, color='#444444', width=1.0, alpha=0.9):
     ax.add_patch(arrow)
 
 
+def create_wordcloud_for_latent_factor(bps, lf, size, min_font_size, max_font_size, color):
+    """Create a single word cloud for a latent factor"""
+    log_memory_usage(f"Creating word cloud for LF {lf}")
+    
+    # Combine all BPs for this latent factor into a single word cloud
+    frequencies = {}
+    for bp_name, score in bps:
+        # Split BP name into words and add each word with the score
+        for word in bp_name.split():
+            # Remove any non-alphanumeric characters from the word
+            word = ''.join(c.lower() for c in word if c.isalnum())
+            if word and len(word) > 2:  # Only add non-empty words with length > 2
+                frequencies[word] = frequencies.get(word, 0) + score
+    
+    if not frequencies:
+        print(f"No valid words for latent factor {lf}")
+        return None, 0, (0, 0)
+    
+    # Calculate total score for this latent factor
+    total_score = sum(score for _, score in bps)
+    
+    # Limit the number of words to reduce memory usage
+    max_words = min(100, len(frequencies))
+    
+    # Create word cloud with constrained resources
+    try:
+        wc = WordCloud(
+            width=800,
+            height=800,
+            background_color='white',
+            max_words=max_words,
+            max_font_size=max_font_size,
+            min_font_size=min_font_size,
+            prefer_horizontal=0.9,
+            relative_scaling=0.5,
+            colormap='viridis',
+            contour_width=1,
+            contour_color='steelblue',
+            random_state=42  # For reproducibility
+        ).generate_from_frequencies(frequencies)
+        
+        # Calculate size based on total score
+        wc_size = min(500, 200 + int(total_score * 30))  # Reduced scaling factor
+        
+        log_memory_usage(f"Created word cloud for LF {lf}")
+        return wc, wc_size, (wc.width, wc.height)
+        
+    except Exception as e:
+        print(f"Error creating word cloud for LF {lf}: {str(e)}")
+        return None, 0, (0, 0)
+
 def create_visualization(
         data: Dict[str, Dict[str, float]],
         connections: List[Tuple[str, str, float]] = None,
         output_path: str = 'enhanced_wordcloud.png',
-        size: int = 1000,  # Increased size for better visualization
-        dpi: int = 300,
+        size: int = 1000,
+        dpi: int = 150,  # Reduced DPI to save memory
         min_font_size: int = 10,
-        max_font_size: int = 120
+        max_font_size: int = 100  # Reduced max font size
 ):
     # Initialize connections if None
     if connections is None:
@@ -129,9 +201,19 @@ def create_visualization(
         warnings.warn("Invalid connections format. Expected List[Tuple[str, str, float]]. Ignoring connections.")
         connections = []
 
-    # Create a new figure with white background
-    fig, ax = plt.subplots(figsize=(size / 100, size / 100), dpi=dpi, facecolor='white')
-    ax.set_facecolor('white')
+    # Create figure and axis with constrained layout
+    plt.ioff()  # Turn off interactive mode to save memory
+    fig, ax = plt.subplots(figsize=(size/100, size/100), dpi=dpi, 
+                          constrained_layout=True)
+    ax.set_xlim(0, size)
+    ax.set_ylim(0, size)
+    ax.axis('off')
+    
+    log_memory_usage("After creating figure")
+    
+    # Start memory tracking
+    tracemalloc.start()
+    log_memory_usage("Starting visualization")
     
     # Group BPs by latent factor
     latent_factors = {}
@@ -144,6 +226,7 @@ def create_visualization(
         latent_factors[lf].append((bp_name, bp_data.get('bp_count', 1)))
     
     print(f"Found {len(latent_factors)} latent factors")
+    log_memory_usage("After grouping by latent factor")
     
     # Calculate positions in a circle
     n = len(latent_factors)
@@ -159,8 +242,16 @@ def create_visualization(
                        key=lambda x: sum(score for _, score in x[1]), 
                        reverse=True)
     
+    # Limit to top N latent factors if there are too many
+    max_latent_factors = 10  # Limit to prevent memory issues
+    if len(sorted_lfs) > max_latent_factors:
+        print(f"Warning: Limiting to top {max_latent_factors} latent factors")
+        sorted_lfs = sorted_lfs[:max_latent_factors]
+    
     # Generate distinct colors for each latent factor
     colors = plt.cm.get_cmap('tab20', len(sorted_lfs))
+    
+    log_memory_usage("After sorting and preparing colors")
     
     for i, (lf, bps) in enumerate(sorted_lfs):
         # Calculate position in circle
@@ -281,10 +372,35 @@ def create_visualization(
         fontsize=10
     )
     
-    # Save the figure
+    # Save the figure with optimized settings
     plt.tight_layout()
-    plt.savefig(output_path, dpi=dpi, bbox_inches='tight', pad_inches=0.2)
-    plt.close()
+    plt.savefig(output_path, 
+               dpi=dpi, 
+               bbox_inches='tight', 
+               pad_inches=0.2,
+               optimize=True,
+               quality=85)  # Reduce quality to save memory
+    plt.close(fig)
+    plt.close('all')
+    
+    # Clear matplotlib cache
+    matplotlib.pyplot.close('all')
+    matplotlib.pyplot.clf()
+    matplotlib.pyplot.cla()
+    
+    # Force garbage collection
+    gc.collect()
+    
+    # Get memory snapshot
+    snapshot = tracemalloc.take_snapshot()
+    top_stats = snapshot.statistics('lineno')
+    
+    print("\nTop memory usage by line:")
+    for stat in top_stats[:10]:  # Show top 10 memory-using lines
+        print(stat)
+    
+    tracemalloc.stop()
+    log_memory_usage("After saving figure")
     print(f"Visualization saved to {os.path.abspath(output_path)}")
 
 
