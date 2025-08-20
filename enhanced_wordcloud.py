@@ -489,6 +489,9 @@ def main():
     output_dir = os.path.dirname(os.path.abspath(args.output))
     os.makedirs(output_dir, exist_ok=True)
 
+    # Initialize connections
+    connections = []
+
     # Load data
     if args.bp_scores and os.path.exists(args.bp_scores):
         print(f"Loading BP scores from {args.bp_scores}")
