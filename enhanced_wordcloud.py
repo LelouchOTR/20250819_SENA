@@ -46,12 +46,21 @@ class CustomWordCloud(WordCloud):
 
 
 def create_circular_mask(size: int) -> np.ndarray:
-    """Create a circular mask for the word cloud"""
+    """Create a circular mask for the word cloud
+    
+    Returns:
+        np.ndarray: A 2D array where white (255) areas are masked out (no words)
+        and black (0) areas are where words can be placed.
+    """
     x, y = np.ogrid[:size, :size]
     center = size // 2
     radius = center - 1
-    mask = (x - center) ** 2 + (y - center) ** 2 > radius ** 2
-    return mask.astype(int) * 255
+    # Create a circular mask where True is outside the circle
+    # Then invert it (1 - mask) so inside is 0 (black, where words go)
+    # and outside is 1 (white, masked out)
+    mask = ((x - center) ** 2 + (y - center) ** 2 <= radius ** 2).astype(int)
+    # Invert to make circle black (0) and background white (255)
+    return (1 - mask) * 255
 
 
 def generate_circular_wordcloud(
