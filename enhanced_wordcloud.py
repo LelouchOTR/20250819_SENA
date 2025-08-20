@@ -228,14 +228,16 @@ def create_visualization(
     print(f"Found {len(latent_factors)} latent factors")
     log_memory_usage("After grouping by latent factor")
     
-    # Calculate positions in a circle
+    # Calculate positions in a circle with better spacing
     n = len(latent_factors)
     if n == 0:
         print("No data to visualize")
         return
         
     center = size // 2
-    radius = size * 0.4  # Radius of the circle for latent factors
+    # Increase radius and add dynamic spacing based on number of factors
+    base_radius = size * 0.4
+    radius = base_radius + (n * 10)  # Increase radius based on number of factors
     
     # Sort latent factors by total score
     sorted_lfs = sorted(latent_factors.items(), 
@@ -250,6 +252,17 @@ def create_visualization(
     
     # Generate distinct colors for each latent factor
     colors = plt.cm.get_cmap('tab20', len(sorted_lfs))
+    
+    # Create a circular mask for word clouds
+    def create_circular_mask(h, w, center=None, radius=None):
+        if center is None:  # use the middle of the image
+            center = (int(w/2), int(h/2))
+        if radius is None:  # use the smallest distance between the center and image walls
+            radius = min(center[0], center[1], w-center[0], h-center[1])
+        Y, X = np.ogrid[:h, :w]
+        dist_from_center = np.sqrt((X - center[0])**2 + (Y - center[1])**2)
+        mask = dist_from_center <= radius
+        return 255 * mask.astype(int)
     
     log_memory_usage("After sorting and preparing colors")
     
@@ -273,31 +286,51 @@ def create_visualization(
             print(f"No valid words for latent factor {lf}")
             continue
             
-        # Create word cloud for this latent factor
+        # Create circular mask for this word cloud
+        mask_size = 800  # Larger mask for better quality
+        mask = create_circular_mask(mask_size, mask_size, radius=mask_size//2)
+        
+        # Create word cloud for this latent factor with circular mask
         wc = WordCloud(
-            width=600,
-            height=600,
+            width=mask_size,
+            height=mask_size,
+            mask=mask,
             background_color='white',
-            max_words=200,
-            max_font_size=max_font_size,
+            max_words=150,  # Slightly fewer words for better spacing
+            max_font_size=max_font_size * 1.5,  # Larger font for better visibility
             min_font_size=min_font_size,
-            prefer_horizontal=0.9,
-            relative_scaling=0.5,
+            prefer_horizontal=0.8,
+            relative_scaling=0.4,  # Better spacing between words
             colormap=plt.cm.get_cmap('viridis'),
-            contour_width=1,
-            contour_color='steelblue',
+            contour_width=0,  # Remove contour for cleaner look
+            margin=5,  # Add margin between words
+            normalize_plurals=True,
+            scale=2.0  # Higher scale for better quality
         ).generate_from_frequencies(frequencies)
         
         # Calculate size based on total score
         total_score = sum(score for _, score in bps)
         wc_size = min(500, 200 + int(total_score * 50))  # Scale size based on total score
         
-        # Add word cloud to plot
+        # Add word cloud to plot with proper aspect ratio and spacing
+        wc_ratio = wc_size / mask_size  # Maintain aspect ratio
         ax.imshow(
             wc, 
             extent=(
-                x - wc_size//2, 
-                x + wc_size//2, 
+                x - (wc_size//2) * 1.2,  # Add 20% more spacing
+                x + (wc_size//2) * 1.2,  # Add 20% more spacing
+                y - (wc_size//2) * wc_ratio * 1.2,  # Maintain aspect ratio with spacing
+                y + (wc_size//2) * wc_ratio * 1.2  # Maintain aspect ratio with spacing
+            ),
+            alpha=0.95,  # Slight transparency for better overlapping visualization
+            zorder=2  # Ensure word clouds are above grid lines
+        )
+        
+        # Add a subtle circular border
+        circle = plt.Circle((x, y), wc_size//2 * 1.05, 
+                          fill=False, color='#888888', 
+                          alpha=0.5, linewidth=1, zorder=3)
+        ax.add_patch(circle)
                 y - wc_size//2, 
                 y + wc_size//2
             ), 
