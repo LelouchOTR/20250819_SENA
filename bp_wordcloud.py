@@ -177,7 +177,7 @@ def filter_bp_terms(godag: GODag,
 
         # Get all ancestor terms
         ancestors = set()
-        for ancestor in goddag[go_id].get_all_parents():
+        for ancestor in godag[go_id].get_all_parents():
             if ancestor in filtered:
                 ancestors.add(ancestor)
 
