@@ -25,30 +25,34 @@ def load_go_data() -> Tuple[GODag, Dict, Dict]:
     """Load GO data and gene to GO term mappings."""
     # Check for GO data files
     obo_file = "data/go-basic.obo"
-    gene2go_file = "data/gene2go"
-    
-    if not os.path.exists(obo_file) or not os.path.exists(gene2go_file):
-        print("GO data files not found. Please ensure you have the following files:")
-        print(f"- {obo_file}")
-        print(f"- {gene2go_file}")
-        print("\nYou can download them using the download_go_data.py script.")
-        sys.exit(1)
-    
-    # Load GO DAG
     print("Loading GO data...")
-    godag = GODag(obo_file, load_obsolete=False)
+    godag = GODag(go_obo_file)
     
-    # Load gene to GO term mappings (human genes)
     print("Loading gene to GO mappings...")
-    gene2go = read_ncbi_gene2go(gene2go_file, taxids=[9606])
+    gene2go = read_ncbi_gene2go(gene2go_file, namespaces=['BP'], go2geneids=True)
     
-    # Create GO to genes mapping
-    go2genes = defaultdict(set)
-    for gene_id, go_terms in gene2go.items():
-        for go_id in go_terms:
-            go2genes[go_id].add(gene_id)
+    # Convert gene IDs to strings for consistency and add GENE_X format
+    gene2go_processed = {}
+    for go_id, genes in gene2go.items():
+        gene2go_processed[go_id] = set()
+        for gene_id in genes:
+            gene_id_str = str(gene_id)
+            gene2go_processed[go_id].add(gene_id_str)
+            # Also add GENE_X format (0-based index)
+            try:
+                gene_num = int(gene_id_str)
+                gene2go_processed[go_id].add(f'GENE_{gene_num-1}')  # Convert to 0-based
+            except ValueError:
+                pass
     
-    return godag, gene2go, go2genes
+    # Create gene-to-GO mapping with both ID formats
+    gene_to_go = defaultdict(list)
+    for go_id, genes in gene2go_processed.items():
+        for gene_id in genes:
+            gene_to_go[gene_id].append(go_id)
+    
+    print(f"{len(gene2go_processed)} GO terms loaded with {len(gene_to_go)} unique gene IDs (including GENE_X format)")
+    return godag, gene_to_go, gene2go_processed
 
 def get_bp_terms(godag: GODag) -> List[str]:
     """Get list of biological process GO terms."""
@@ -266,28 +270,39 @@ def generate_enhanced_wordcloud(bp_scores: Dict[str, float],
 def extract_gene_scores(model_path: str) -> Dict[str, float]:
     """Extract gene importance scores from model."""
     print(f"Loading model from {model_path}...")
-    model_data = torch.load(model_path, map_location=torch.device('cpu'))
-    state_dict = model_data[0]  # First element is the state dict
+    model_data = torch.load(model_path, map_location='cpu')
     
-    # Extract gene importance from decoder weights
+    # Extract gene importance scores (using L2 norm of decoder weights as a proxy)
     print("Extracting gene importance scores...")
+    if isinstance(model_data, tuple):
+        # Handle tuple format (state_dict, config, stats)
+        state_dict = model_data[0]
+        
+        # Look for decoder weights in the state dict
+        decoder_weights = None
+        for k, v in state_dict.items():
+            if 'decoder' in k and 'weight' in k and len(v.shape) == 2:
+                decoder_weights = v
+                break
+        
+        if decoder_weights is None:
+            raise ValueError("Could not find decoder weights in the model")
+            
+    else:
+        # Assume model_data is already the weights tensor
+        decoder_weights = model_data
     
-    # Get the decoder weights (last layer before output)
-    decoder_weights = state_dict['decoder.network.12.weight']  # Shape: (output_genes, hidden_units)
+    # Calculate L2 norm of each gene's weights
+    gene_scores = torch.norm(decoder_weights, p=2, dim=0)
     
-    # Calculate importance as L2 norm across hidden units for each gene
-    gene_importance = torch.norm(decoder_weights, p=2, dim=1)
+    # Convert to dict with gene IDs - use both GENE_X and numeric IDs for compatibility
+    gene_scores_dict = {}
+    for i, score in enumerate(gene_scores):
+        gene_scores_dict[f'GENE_{i}'] = score.item()
+        gene_scores_dict[str(i+1)] = score.item()  # Add numeric ID mapping (1-based to match GO)
     
-    # Normalize to 0-1 range
-    gene_importance = (gene_importance - gene_importance.min()) / (gene_importance.max() - gene_importance.min() + 1e-8)
-    
-    # Create gene_id to score mapping
-    # In a real scenario, you'd map these to actual gene IDs from your dataset
-    gene_scores = {f"GENE_{i}": float(score) 
-                  for i, score in enumerate(gene_importance)}
-    
-    print(f"Extracted scores for {len(gene_scores)} genes")
-    return gene_scores
+    print(f"Extracted scores for {len(gene_scores)} genes (with both GENE_X and numeric IDs)")
+    return gene_scores_dict
 
 def main():
     # Check if model path is provided
