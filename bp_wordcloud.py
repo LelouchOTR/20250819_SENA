@@ -364,16 +364,33 @@ def extract_causal_connections(model_data) -> List[Tuple[str, str, float]]:
         print(f"State dict type: {type(state_dict)}")
         if isinstance(state_dict, dict):
             print("State dict keys:", list(state_dict.keys()))
+            
+            # Look for NetworkActivity_layer weight matrices
+            # These are likely to be the causal graphs
             for key, value in state_dict.items():
-                if 'causal_graph' in key.lower() or 'G' in key:
-                    if torch.is_tensor(value):
+                if 'network' in key.lower() and 'weight' in key.lower():
+                    # Check if this is a square matrix that could represent a causal graph
+                    if torch.is_tensor(value) and len(value.shape) == 2 and value.shape[0] == value.shape[1]:
                         causal_graph = value.detach().cpu().numpy()
-                        print(f"Found causal graph in tuple state_dict key: {key}")
+                        print(f"Found potential causal graph in state_dict key: {key}, shape: {value.shape}")
                         break
-                    elif isinstance(value, np.ndarray):
+                    elif isinstance(value, np.ndarray) and len(value.shape) == 2 and value.shape[0] == value.shape[1]:
                         causal_graph = value
-                        print(f"Found causal graph in tuple state_dict key: {key}")
+                        print(f"Found potential causal graph in state_dict key: {key}, shape: {value.shape}")
                         break
+            
+            # If still no causal graph found, look for any square matrices
+            if causal_graph is None:
+                for key, value in state_dict.items():
+                    if torch.is_tensor(value) and len(value.shape) == 2 and value.shape[0] == value.shape[1]:
+                        causal_graph = value.detach().cpu().numpy()
+                        print(f"Found square matrix in state_dict key: {key}, shape: {value.shape}")
+                        break
+                    elif isinstance(value, np.ndarray) and len(value.shape) == 2 and value.shape[0] == value.shape[1]:
+                        causal_graph = value
+                        print(f"Found square matrix in state_dict key: {key}, shape: {value.shape}")
+                        break
+                        
     else:
         # Try to find any 2D tensor in the model that might be the causal graph
         def find_tensor(obj):
