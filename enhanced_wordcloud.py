@@ -434,8 +434,10 @@ def create_visualization(
         
         # Add latent factor label with colored background
         lf_label = f"LF {lf}"
+        # Only label as "Other" if it's specifically the "unassigned" category (LF 0)
+        # But still show it as "LF 0" for clarity
         if lf == 0:
-            lf_label = "Other"
+            lf_label = "LF 0 (Unassigned)"
         
         # Add label
         ax.text(
@@ -472,7 +474,7 @@ def create_visualization(
             [0], [0], 
             marker='o', 
             color='w', 
-            label=f'LF {lf if lf != 0 else "Other"}',
+            label=f'LF {lf}{" (Unassigned)" if lf == 0 else ""}',
             markerfacecolor=colors(i), 
             markersize=15
         )
