@@ -344,22 +344,8 @@ def create_visualization(
                    zorder=5)
             
             img = wc.to_array()
-    
-    # Save the final figure after all elements are added
-    plt.tight_layout(pad=0)
-    plt.savefig(output_path, dpi=dpi, bbox_inches='tight', pad_inches=0)
-    plt.close()
-    print(f"Word cloud saved to {os.path.abspath(output_path)}")
             
-            # Calculate zoom factor with better scaling for the available space
-            # Base zoom is higher to fill more space
-            base_zoom = 0.5  # Increased base zoom for better visibility
-            # Scale zoom based on word cloud size but with less variation
-            zoom = base_zoom * (0.8 + 0.4 * (wc_size - 300) / 150)  # Scale between 0.8x and 1.2x of base zoom
-            
-            # Ensure zoom stays within reasonable bounds
-            zoom = max(0.4, min(0.7, zoom))
-            
+            # Create and add the image box
             imagebox = OffsetImage(img, zoom=zoom, resample=True)
             ab = AnnotationBbox(
                 imagebox, 
@@ -369,6 +355,12 @@ def create_visualization(
                 zorder=2  # Above circles, below labels
             )
             ax.add_artist(ab)
+    
+    # Save the final figure after all elements are added
+    plt.tight_layout(pad=0)
+    plt.savefig(output_path, dpi=dpi, bbox_inches='tight', pad_inches=0)
+    plt.close()
+    print(f"Word cloud saved to {os.path.abspath(output_path)}")
     
     # No legend - removed per user request
     
