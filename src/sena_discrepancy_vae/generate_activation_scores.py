@@ -55,7 +55,36 @@ def generating_data(config_file, fpath, batch_size=32):
 
     """load best model"""
     # load weights
-    model = torch.load(f"{fpath}/best_model.pt")
+    model_tuple = torch.load(f"{fpath}/best_model.pt", map_location=device)
+    state_dict, config, _ = model_tuple
+
+    # get parameters from config
+    try:
+        hparams = json.loads(config['hparams'])
+    except json.JSONDecodeError:
+        print(f"Error decoding hparams: {config['hparams']}")
+        hparams = {}
+
+    z_dim = hparams.get('latdim', 256) # default to 256 if not found
+    mode = hparams.get('model', 'sena') # default to sena if not found
+    sena_lambda = hparams.get('sena_lambda', 0.1) # default to 0.1 if not found
+    
+    # instantiate model
+    model = CMVAE(
+        dim=adata.X.shape[1],
+        z_dim=z_dim,
+        c_dim=len(ptb_targets),
+        device=device,
+        mode=mode,
+        gos=gos,
+        rel_dict=data_handler.rel_dict,
+        sena_lambda=sena_lambda,
+    ).double().to(device)
+
+    # load state dict
+    print("Keys in loaded state_dict:", state_dict.keys())
+    print("Keys in model:", model.state_dict().keys())
+    model.load_state_dict(state_dict)
 
     ##
     n_pertb = len(ptb_targets)
