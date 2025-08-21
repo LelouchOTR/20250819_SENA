@@ -264,15 +264,34 @@ def generating_data(config_file, fpath, batch_size=32):
                 var_weights = value
         
         if mean_weights is not None and gos:
-            results_dict['mean_delta_matrix'] = pd.DataFrame(mean_weights.detach().cpu().numpy(), index=gos)
+            if mean_weights.shape[0] == len(gos):
+                results_dict['mean_delta_matrix'] = pd.DataFrame(mean_weights.detach().cpu().numpy(), index=gos)
+            else:
+                logging.warning(f"Shape of mean_weights ({mean_weights.shape[0]}) does not match number of GO terms ({len(gos)}). Not creating mean_delta_matrix.")
+                results_dict['mean_delta_matrix'] = None
         if var_weights is not None and gos:
-            results_dict['std_delta_matrix'] = pd.DataFrame(var_weights.detach().cpu().numpy(), index=gos)
+            if var_weights.shape[0] == len(gos):
+                results_dict['std_delta_matrix'] = pd.DataFrame(var_weights.detach().cpu().numpy(), index=gos)
+            else:
+                logging.warning(f"Shape of var_weights ({var_weights.shape[0]}) does not match number of GO terms ({len(gos)}). Not creating std_delta_matrix.")
+                results_dict['std_delta_matrix'] = None
     else:
         try:
-            results_dict['mean_delta_matrix'] = pd.DataFrame(model.fc_mean.weight.detach().cpu().numpy().T, index=gos) 
-            results_dict['std_delta_matrix'] = pd.DataFrame(model.fc_var.weight.detach().cpu().numpy().T, index=gos) 
-        except:
-            logging.warning("Could not extract mean/std delta matrices")
+            mean_weights = model.fc_mean.weight.detach().cpu().numpy().T
+            if mean_weights.shape[0] == len(gos):
+                results_dict['mean_delta_matrix'] = pd.DataFrame(mean_weights, index=gos)
+            else:
+                logging.warning(f"Shape of mean_weights ({mean_weights.shape[0]}) does not match number of GO terms ({len(gos)}). Not creating mean_delta_matrix.")
+                results_dict['mean_delta_matrix'] = None
+
+            var_weights = model.fc_var.weight.detach().cpu().numpy().T
+            if var_weights.shape[0] == len(gos):
+                results_dict['std_delta_matrix'] = pd.DataFrame(var_weights, index=gos)
+            else:
+                logging.warning(f"Shape of var_weights ({var_weights.shape[0]}) does not match number of GO terms ({len(gos)}). Not creating std_delta_matrix.")
+                results_dict['std_delta_matrix'] = None
+        except Exception as e:
+            logging.warning(f"Could not extract mean/std delta matrices: {e}")
             results_dict['mean_delta_matrix'] = None
             results_dict['std_delta_matrix'] = None
 
@@ -483,15 +502,34 @@ def generating_data_from_model_path(model_path, batch_size=32):
                 var_weights = value
         
         if mean_weights is not None and gos:
-            results_dict['mean_delta_matrix'] = pd.DataFrame(mean_weights.detach().cpu().numpy(), index=gos)
+            if mean_weights.shape[0] == len(gos):
+                results_dict['mean_delta_matrix'] = pd.DataFrame(mean_weights.detach().cpu().numpy(), index=gos)
+            else:
+                logging.warning(f"Shape of mean_weights ({mean_weights.shape[0]}) does not match number of GO terms ({len(gos)}). Not creating mean_delta_matrix.")
+                results_dict['mean_delta_matrix'] = None
         if var_weights is not None and gos:
-            results_dict['std_delta_matrix'] = pd.DataFrame(var_weights.detach().cpu().numpy(), index=gos)
+            if var_weights.shape[0] == len(gos):
+                results_dict['std_delta_matrix'] = pd.DataFrame(var_weights.detach().cpu().numpy(), index=gos)
+            else:
+                logging.warning(f"Shape of var_weights ({var_weights.shape[0]}) does not match number of GO terms ({len(gos)}). Not creating std_delta_matrix.")
+                results_dict['std_delta_matrix'] = None
     else:
         try:
-            results_dict['mean_delta_matrix'] = pd.DataFrame(model.fc_mean.weight.detach().cpu().numpy().T, index=gos) 
-            results_dict['std_delta_matrix'] = pd.DataFrame(model.fc_var.weight.detach().cpu().numpy().T, index=gos) 
-        except:
-            logging.warning("Could not extract mean/std delta matrices")
+            mean_weights = model.fc_mean.weight.detach().cpu().numpy().T
+            if mean_weights.shape[0] == len(gos):
+                results_dict['mean_delta_matrix'] = pd.DataFrame(mean_weights, index=gos)
+            else:
+                logging.warning(f"Shape of mean_weights ({mean_weights.shape[0]}) does not match number of GO terms ({len(gos)}). Not creating mean_delta_matrix.")
+                results_dict['mean_delta_matrix'] = None
+
+            var_weights = model.fc_var.weight.detach().cpu().numpy().T
+            if var_weights.shape[0] == len(gos):
+                results_dict['std_delta_matrix'] = pd.DataFrame(var_weights, index=gos)
+            else:
+                logging.warning(f"Shape of var_weights ({var_weights.shape[0]}) does not match number of GO terms ({len(gos)}). Not creating std_delta_matrix.")
+                results_dict['std_delta_matrix'] = None
+        except Exception as e:
+            logging.warning(f"Could not extract mean/std delta matrices: {e}")
             results_dict['mean_delta_matrix'] = None
             results_dict['std_delta_matrix'] = None
 
