@@ -1,60 +1,33 @@
-# Biological Process Visualization Pipeline
+# Biological Process N-gram Processing
 
-This pipeline has been updated to work with biological processes from the Norman2019 dataset instead of gene names. Here's how to use it:
+This project now includes n-gram processing for biological process terms to preserve complete terms like "fatty acid beta-oxidation" instead of splitting them into individual words.
 
-## Setup
+## Implementation Details
 
-1. First, install the required dependencies:
-   ```bash
-   pip install -r dockerfile/requirements.txt
-   ```
+The n-gram processing is implemented in `ngram_bp_processor.py` and integrated into:
+1. `bp_wordcloud.py` - For processing biological process names
+2. `enhanced_wordcloud.py` - For generating word clouds with complete terms
 
-2. Download the required GO data:
-   ```bash
-   python download_go_data.py
-   ```
-   This will download:
-   - GO OBO file (go-basic.obo)
-   - gene2go file (from NCBI)
+## Key Features
 
-## Running the Pipeline
+1. **Preserves Complete Terms**: Keeps multi-word biological process names intact (e.g., "fatty acid beta-oxidation")
+2. **Fallback Processing**: If n-gram processing is not available, falls back to basic word splitting
+3. **Generic Term Filtering**: Still filters out generic biomedical terms from `generic_terms.py`
+4. **Flexible N-gram Generation**: Generates n-grams up to 4 words for comprehensive term coverage
 
-1. First, extract the graph data:
-   ```bash
-   python extract_graph_data.py --model <model_name>
-   ```
-   This will:
-   - Load the Norman2019 dataset
-   - Process biological processes
-   - Generate visualization data in the `output/` directory
+## How It Works
 
-2. Generate the word cloud visualization:
-   ```bash
-   python enhanced_wordcloud.py --data-dir output --output output/biological_processes_wordcloud.png
-   ```
+1. Known biological process n-grams are preserved as complete terms
+2. Remaining text is tokenized and processed into additional n-grams
+3. Generic terms are filtered out to focus on meaningful biological terms
+4. Both complete terms and component n-grams are included in the word cloud
 
-## Key Changes
+## Example Output
 
-1. **Biological Process Integration**:
-   - Added support for loading and processing biological processes from GO
-   - Integrated with Norman2019 dataset
-   - Fallback to mock processes if GO data is not available
+For the term "fatty acid beta-oxidation":
+- Preserved as complete term: "fatty acid beta-oxidation"
+- Individual components are also available for word cloud granularity
 
-2. **Data Flow**:
-   - Loads Norman2019 dataset (raw or reduced)
-   - Maps GO terms to biological processes
-   - Generates visualization data with process names
-   - Creates an interactive word cloud
+## Usage
 
-3. **Output Files**:
-   - `output/nodes.json`: Node data with biological processes
-   - `output/connections.json`: Connection data between nodes
-   - `output/bp_mappings.csv`: Mapping between latent factors and biological processes
-   - `output/bp_counts.csv`: Count of processes per latent factor
-
-## Customization
-
-You can adjust the following parameters in `extract_graph_data.py`:
-- `top_k`: Number of latent factors to visualize (default: 7)
-- Connection threshold in the visualization data generation
-- Process filtering criteria
+The n-gram processing is automatically used when generating word clouds. No additional configuration is required.

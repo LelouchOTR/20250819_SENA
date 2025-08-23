@@ -20,6 +20,14 @@ import networkx as nx
 # Import generic terms filter
 from generic_terms import GENERIC_BIOMEDICAL_TERMS
 
+# Import n-gram processor
+try:
+    from ngram_bp_processor import process_bp_name_for_wordcloud
+    NGRAM_PROCESSING_AVAILABLE = True
+except ImportError:
+    NGRAM_PROCESSING_AVAILABLE = False
+    print("Warning: n-gram processing not available. Using basic word splitting.")
+
 
 def log_memory_usage(label: str = ''):
     """Log current memory usage"""
@@ -250,13 +258,26 @@ def create_visualization(
         # Combine all BPs for this latent factor into a single word cloud
         frequencies = {}
         for bp_name, score in bps:
-            # Split BP name into words and add each word with the score
-            for word in bp_name.split():
-                # Remove any non-alphanumeric characters from the word
-                word = ''.join(c for c in word if c.isalnum())
+            # Use n-gram processing if available, otherwise fall back to basic word splitting
+            if NGRAM_PROCESSING_AVAILABLE:
+                terms = process_bp_name_for_wordcloud(bp_name)
+            else:
+                # Fallback to basic word splitting
+                terms = bp_name.split()
+            
+            # Add each term with the score
+            for term in terms:
+                # Clean term
+                if NGRAM_PROCESSING_AVAILABLE:
+                    # For n-grams, we want to preserve spaces and most characters
+                    cleaned_term = term.strip()
+                else:
+                    # Remove any non-alphanumeric characters from the term
+                    cleaned_term = ''.join(c for c in term if c.isalnum())
+                
                 # Filter out generic biomedical terms
-                if word and word.lower() not in GENERIC_BIOMEDICAL_TERMS:  # Only add non-empty, non-generic words
-                    frequencies[word] = frequencies.get(word, 0) + score
+                if cleaned_term and cleaned_term.lower() not in GENERIC_BIOMEDICAL_TERMS:  # Only add non-empty, non-generic terms
+                    frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score
         
         if not frequencies:
             print(f"No valid words for latent factor {lf}")
@@ -376,13 +397,26 @@ def create_visualization(
         # Combine all BPs for this latent factor into a single word cloud
         frequencies = {}
         for bp_name, score in bps:
-            # Split BP name into words and add each word with the score
-            for word in bp_name.split():
-                # Remove any non-alphanumeric characters from the word
-                word = ''.join(c for c in word if c.isalnum())
+            # Use n-gram processing if available, otherwise fall back to basic word splitting
+            if NGRAM_PROCESSING_AVAILABLE:
+                terms = process_bp_name_for_wordcloud(bp_name)
+            else:
+                # Fallback to basic word splitting
+                terms = bp_name.split()
+            
+            # Add each term with the score
+            for term in terms:
+                # Clean term
+                if NGRAM_PROCESSING_AVAILABLE:
+                    # For n-grams, we want to preserve spaces and most characters
+                    cleaned_term = term.strip()
+                else:
+                    # Remove any non-alphanumeric characters from the term
+                    cleaned_term = ''.join(c for c in term if c.isalnum())
+                
                 # Filter out generic biomedical terms
-                if word and word.lower() not in GENERIC_BIOMEDICAL_TERMS:  # Only add non-empty, non-generic words
-                    frequencies[word] = frequencies.get(word, 0) + score
+                if cleaned_term and cleaned_term.lower() not in GENERIC_BIOMEDICAL_TERMS:  # Only add non-empty, non-generic terms
+                    frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score
         
         if not frequencies:
             continue

@@ -20,6 +20,14 @@ from wordcloud import WordCloud
 # Import generic terms filter
 from generic_terms import GENERIC_BIOMEDICAL_TERMS
 
+# Import n-gram processor
+try:
+    from ngram_bp_processor import process_bp_name_for_wordcloud
+    NGRAM_PROCESSING_AVAILABLE = True
+except ImportError:
+    NGRAM_PROCESSING_AVAILABLE = False
+    print("Warning: n-gram processing not available. Using basic word splitting.")
+
 # Configuration
 OUTPUT_DIR = Path("visualization_output")
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -94,8 +102,8 @@ def process_bp_name(name: str) -> str:
     name = re.sub(r'^[a-z\s]*negative regulation of\s*', '', name, flags=re.IGNORECASE)
 
     # Remove anything in parentheses and brackets
-    name = re.sub(r'\s*\([^)]*\)', '', name)
-    name = re.sub(r'\s*\[[^]]*\]', '', name)
+    name = re.sub(r'\s*\(.*?\)', '', name)
+    name = re.sub(r'\s*\[.*?\]', '', name)
 
     # Remove GO:XXXXXX IDs
     name = re.sub(r'GO:\d+', '', name)
@@ -115,6 +123,16 @@ def process_bp_name(name: str) -> str:
     name = name.strip().title()
 
     return name
+
+
+def process_bp_name_with_ngrams(name: str) -> List[str]:
+    """Process biological process name to extract n-grams for word cloud."""
+    if NGRAM_PROCESSING_AVAILABLE:
+        return process_bp_name_for_wordcloud(name)
+    else:
+        # Fallback to basic word splitting
+        processed_name = process_bp_name(name)
+        return processed_name.split()
 
 
 def get_gene_to_go(gene2go: Dict) -> Dict[str, List[str]]:
@@ -292,7 +310,8 @@ def map_genes_to_bp(gene_scores: Dict[str, float],
             bp_data[bp_name] = {
                 'bp_count': float(avg_score),
                 'latent_factor': int(latent_factor),
-                'gene_count': len(scores)
+                'gene_count': len(scores),
+                'original_name': bp_info['name']  # Store original name for n-gram processing
             }
 
     # Sort BPs by score in descending order

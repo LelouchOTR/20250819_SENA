@@ -137,6 +137,12 @@ The script accepts several command-line arguments to customize the training proc
 
 Refer to `README_ablation.md` in the `src` folder.
 
+## Biological Process N-gram Processing
+
+This project now includes n-gram processing for biological process terms to preserve complete terms like "fatty acid beta-oxidation" instead of splitting them into individual words.
+
+See [BIOLOGICAL_PROCESSES_README.md](BIOLOGICAL_PROCESSES_README.md) for more details on implementation and usage.
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
