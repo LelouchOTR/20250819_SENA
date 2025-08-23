@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 import tracemalloc
 from typing import Dict, List, Tuple
@@ -15,6 +16,9 @@ import matplotlib.patheffects as patheffects
 import numpy as np
 from wordcloud import WordCloud
 import networkx as nx
+
+# Import generic terms filter
+from generic_terms import GENERIC_BIOMEDICAL_TERMS
 
 
 def log_memory_usage(label: str = ''):
@@ -250,7 +254,8 @@ def create_visualization(
             for word in bp_name.split():
                 # Remove any non-alphanumeric characters from the word
                 word = ''.join(c for c in word if c.isalnum())
-                if word:  # Only add non-empty words
+                # Filter out generic biomedical terms
+                if word and word.lower() not in GENERIC_BIOMEDICAL_TERMS:  # Only add non-empty, non-generic words
                     frequencies[word] = frequencies.get(word, 0) + score
         
         if not frequencies:
@@ -375,7 +380,8 @@ def create_visualization(
             for word in bp_name.split():
                 # Remove any non-alphanumeric characters from the word
                 word = ''.join(c for c in word if c.isalnum())
-                if word:  # Only add non-empty words
+                # Filter out generic biomedical terms
+                if word and word.lower() not in GENERIC_BIOMEDICAL_TERMS:  # Only add non-empty, non-generic words
                     frequencies[word] = frequencies.get(word, 0) + score
         
         if not frequencies:

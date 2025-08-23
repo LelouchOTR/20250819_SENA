@@ -17,6 +17,9 @@ from goatools.obo_parser import GODag
 from tqdm import tqdm
 from wordcloud import WordCloud
 
+# Import generic terms filter
+from generic_terms import GENERIC_BIOMEDICAL_TERMS
+
 # Configuration
 OUTPUT_DIR = Path("visualization_output")
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -98,7 +101,17 @@ def process_bp_name(name: str) -> str:
     name = re.sub(r'GO:\d+', '', name)
 
     # Clean up and title case
-    name = ' '.join(word for word in name.split() if word.lower() not in {'of', 'in', 'to', 'by', 'for'})
+    words = name.split()
+    filtered_words = []
+    for word in words:
+        # Remove non-alphanumeric characters for comparison
+        clean_word = re.sub(r'[^a-zA-Z0-9]', '', word).lower()
+        # Skip generic terms and common prepositions/articles
+        if (clean_word not in GENERIC_BIOMEDICAL_TERMS and 
+            clean_word not in {'of', 'in', 'to', 'by', 'for', 'and', 'or', 'the', 'a', 'an'}):
+            filtered_words.append(word)
+    
+    name = ' '.join(filtered_words)
     name = name.strip().title()
 
     return name
