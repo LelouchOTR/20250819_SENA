@@ -81,27 +81,39 @@ def extract_ngrams(text: str, max_n: int = 4) -> List[str]:
     # Combine preserved terms and generated n-grams
     return preserved_terms + ngrams
 
-def process_bp_name_for_wordcloud(bp_name: str) -> List[str]:
+def process_bp_name_for_wordcloud(bp_name: str, preserve_complete_terms: bool = True) -> List[str]:
     """
     Process a biological process name to extract meaningful terms for word cloud.
     
     Args:
         bp_name: Biological process name
+        preserve_complete_terms: If True, prioritizes complete terms over components
         
     Returns:
-        List of meaningful terms including both complete n-grams and individual words
+        List of meaningful terms with emphasis on complete biological process names
     """
     # Extract all n-grams
     ngrams = extract_ngrams(bp_name, max_n=4)
     
-    # Filter out generic terms and return
+    # Filter out generic terms
     filtered_terms = []
+    complete_terms = []
+    
     for term in ngrams:
         # Skip generic biomedical terms
         if term.lower() not in GENERIC_BIOMEDICAL_TERMS:
             filtered_terms.append(term)
+            # Identify complete biological process terms (longer multi-word phrases)
+            if len(term.split()) > 1 and len(term) > 15:  # Heuristic: multi-word and reasonably long
+                complete_terms.append(term)
     
-    return filtered_terms
+    # If we want to prioritize complete terms, return only those
+    # Otherwise return all terms with complete terms appearing multiple times for emphasis
+    if preserve_complete_terms and complete_terms:
+        # Return complete terms with higher frequency and all other terms with lower frequency
+        return complete_terms + [term for term in filtered_terms if term not in complete_terms]
+    else:
+        return filtered_terms
 
 # Example usage
 if __name__ == "__main__":

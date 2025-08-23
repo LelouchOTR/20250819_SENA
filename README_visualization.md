@@ -40,23 +40,27 @@ Next, extract graph data using the pretrained model:
 python extract_graph_data.py --model pretrained_models/Norman2019_prep_new/sweep_Norman2019_prep_new_split5_model_seed=30_epoch=141.pt
 ```
 
-### 3. Generate Biological Process Wordcloud
+### 4. Generate Biological Process Wordcloud
 Create a basic wordcloud of biological processes:
 
 ```bash
 python bp_wordcloud.py pretrained_models/Norman2019_prep_new/sweep_Norman2019_prep_new_split5_model_seed=30_epoch=141.pt bp_wordcloud.png
 ```
 
-### 5. Generate Enhanced Wordcloud
-Create an enhanced wordcloud with additional visual features:
+### 4. Generate Enhanced Wordcloud with N-gram Processing
+Create an enhanced wordcloud that preserves complete biological process terms (e.g., "fatty acid beta-oxidation") rather than splitting them:
 
 ```bash
 python enhanced_wordcloud.py visualization_output/bp_scores.json --output visualization_output/enhanced_bp_wordcloud.png
 ```
 
-## Enhanced Wordcloud
+## Enhanced Wordcloud with N-gram Processing
 
 The enhanced wordcloud is generated using the `bp_scores.json` file that is automatically created when running the `bp_wordcloud.py` script. This file contains the biological process scores and latent factor information.
+
+The enhanced wordcloud now includes n-gram processing that preserves complete biological process terms (e.g., "fatty acid beta-oxidation") rather than splitting them into individual words. This provides more meaningful and interpretable visualizations for biomedical research.
+
+See [BIOLOGICAL_PROCESSES_README.md](BIOLOGICAL_PROCESSES_README.md) for more details on the n-gram processing implementation.
 ## Optional: Inspect Model
 
 If you need to verify the model's structure and parameters, you can use:
@@ -69,3 +73,4 @@ python inspect_model.py pretrained_models/Norman2019_prep_new/sweep_Norman2019_p
 - The model files and paths should be adjusted according to your specific setup.
 - Ensure all required data files are in the correct locations before running the scripts.
 - The enhanced wordcloud provides better visualization with improved layout, coloring, and text processing compared to the basic wordcloud.
+- The n-gram processing ensures that complete biological process terms like "fatty acid beta-oxidation" are preserved rather than being split into individual words.

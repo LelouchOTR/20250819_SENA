@@ -260,13 +260,13 @@ def create_visualization(
         for bp_name, score in bps:
             # Use n-gram processing if available, otherwise fall back to basic word splitting
             if NGRAM_PROCESSING_AVAILABLE:
-                terms = process_bp_name_for_wordcloud(bp_name)
+                terms = process_bp_name_for_wordcloud(bp_name, preserve_complete_terms=True)
             else:
                 # Fallback to basic word splitting
                 terms = bp_name.split()
             
-            # Add each term with the score
-            for term in terms:
+            # Add each term with the score, emphasizing complete terms
+            for i, term in enumerate(terms):
                 # Clean term
                 if NGRAM_PROCESSING_AVAILABLE:
                     # For n-grams, we want to preserve spaces and most characters
@@ -277,7 +277,12 @@ def create_visualization(
                 
                 # Filter out generic biomedical terms
                 if cleaned_term and cleaned_term.lower() not in GENERIC_BIOMEDICAL_TERMS:  # Only add non-empty, non-generic terms
-                    frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score
+                    # Give higher weight to complete terms (first occurrences)
+                    if NGRAM_PROCESSING_AVAILABLE and i < len(terms) // 2:
+                        # Boost weight for complete terms
+                        frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score * 2.0
+                    else:
+                        frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score
         
         if not frequencies:
             print(f"No valid words for latent factor {lf}")
@@ -399,13 +404,13 @@ def create_visualization(
         for bp_name, score in bps:
             # Use n-gram processing if available, otherwise fall back to basic word splitting
             if NGRAM_PROCESSING_AVAILABLE:
-                terms = process_bp_name_for_wordcloud(bp_name)
+                terms = process_bp_name_for_wordcloud(bp_name, preserve_complete_terms=True)
             else:
                 # Fallback to basic word splitting
                 terms = bp_name.split()
             
-            # Add each term with the score
-            for term in terms:
+            # Add each term with the score, emphasizing complete terms
+            for i, term in enumerate(terms):
                 # Clean term
                 if NGRAM_PROCESSING_AVAILABLE:
                     # For n-grams, we want to preserve spaces and most characters
@@ -416,7 +421,12 @@ def create_visualization(
                 
                 # Filter out generic biomedical terms
                 if cleaned_term and cleaned_term.lower() not in GENERIC_BIOMEDICAL_TERMS:  # Only add non-empty, non-generic terms
-                    frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score
+                    # Give higher weight to complete terms (first occurrences)
+                    if NGRAM_PROCESSING_AVAILABLE and i < len(terms) // 2:
+                        # Boost weight for complete terms
+                        frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score * 2.0
+                    else:
+                        frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score
         
         if not frequencies:
             continue
