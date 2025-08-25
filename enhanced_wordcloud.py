@@ -163,10 +163,10 @@ def create_visualization(
         data: Dict[str, Dict[str, float]],
         connections: List[Tuple[str, str, float]] = None,
         output_path: str = 'enhanced_wordcloud.png',
-        size: int = 1000,
-        dpi: int = 150,  # Reduced DPI to save memory
-        min_font_size: int = 10,
-        max_font_size: int = 100  # Reduced max font size
+        size: int = 1200,  # Increased size for better resolution
+        dpi: int = 300,  # Increased DPI for better quality
+        min_font_size: int = 12,  # Increased min font size
+        max_font_size: int = 150  # Increased max font size
 ):
     # Initialize connections if None
     if connections is None:
@@ -222,8 +222,8 @@ def create_visualization(
         
     center = size // 2
     # Increase radius and add dynamic spacing based on number of factors
-    base_radius = size * 0.3  # Reduced base radius
-    radius = base_radius + (n * 15)  # More spacing between circles
+    base_radius = size * 0.35  # Increased base radius to use more space
+    radius = base_radius + (n * 5)  # Reduced spacing between circles to fit more
     
     # Sort latent factors by total score
     sorted_lfs = sorted(latent_factors.items(), 
@@ -231,7 +231,7 @@ def create_visualization(
                        reverse=True)
     
     # Limit to top N latent factors if there are too many
-    max_latent_factors = 15  # Increased limit to accommodate more latent factors
+    max_latent_factors = 25  # Increased limit to accommodate more latent factors
     if len(sorted_lfs) > max_latent_factors:
         print(f"Warning: Limiting to top {max_latent_factors} latent factors")
         sorted_lfs = sorted_lfs[:max_latent_factors]
@@ -249,7 +249,7 @@ def create_visualization(
     # First, calculate all positions for word clouds
     for i, (lf, bps) in enumerate(sorted_lfs):
         # Calculate position in circle
-        angle = 2 * np.pi * i / n
+        angle = 2 * np.pi * i / len(sorted_lfs)  # Use actual length after filtering
         x = center + radius * np.cos(angle)
         y = center + radius * np.sin(angle)
         
@@ -296,7 +296,7 @@ def create_visualization(
             continue
             
         # Create word cloud for this latent factor with circular mask
-        mask_size = 800  # Larger mask for better quality
+        mask_size = 1000  # Increased mask size for better quality
         mask = create_circular_mask(mask_size)
         
         # Create word cloud
@@ -305,14 +305,14 @@ def create_visualization(
             height=mask_size,
             mask=mask,
             background_color='white',
-            max_words=150,
+            max_words=200,  # Increased max words
             max_font_size=max_font_size,
             min_font_size=min_font_size,
             prefer_horizontal=0.9,
-            relative_scaling=0.5,
+            relative_scaling=0.7,  # Increased relative scaling for better size distribution
             colormap=plt.cm.get_cmap('viridis'),
             contour_width=0,
-            margin=2,
+            margin=1,  # Reduced margin to fit more words
             normalize_plurals=True,
             scale=1.0,
             mode='RGBA',
@@ -321,12 +321,12 @@ def create_visualization(
         
         # Calculate size based on number of biological processes
         bp_count = len(bps)
-        # Scale size between 150 and 300 based on bp_count
+        # Scale size between 200 and 400 based on bp_count (larger range)
         if max_count > min_count:
             scale_factor = (bp_count - min_count) / (max_count - min_count)
         else:
             scale_factor = 0.5
-        wc_size = 150 + int(scale_factor * 150)
+        wc_size = 200 + int(scale_factor * 200)
         
         # Store position and size for arrow connections (x, y, radius)
         lf_positions[str(lf)] = (x, y, wc_size/2)
@@ -376,8 +376,8 @@ def create_visualization(
                     print(f"    Arrow end: ({end_x:.2f}, {end_y:.2f})")
                     
                     # Draw arrow with weight-based width and better visibility
-                    arrow_width = max(0.5, 1.0 + weight * 10)  # More responsive width scaling
-                    arrow_alpha = 0.8  # Less transparent
+                    arrow_width = max(1.0, 1.5 + weight * 15)  # More responsive width scaling
+                    arrow_alpha = 0.9  # Less transparent
                     print(f"    Arrow width: {arrow_width:.2f}, alpha: {arrow_alpha}")
                     
                     draw_curved_arrow(ax, 
@@ -445,7 +445,7 @@ def create_visualization(
             continue
             
         # Create word cloud for this latent factor with circular mask
-        mask_size = 800  # Larger mask for better quality
+        mask_size = 1000  # Increased mask size for better quality
         mask = create_circular_mask(mask_size)
         
         # Create word cloud
@@ -454,14 +454,14 @@ def create_visualization(
             height=mask_size,
             mask=mask,
             background_color='white',
-            max_words=150,
+            max_words=200,  # Increased max words
             max_font_size=max_font_size,
             min_font_size=min_font_size,
             prefer_horizontal=0.9,
-            relative_scaling=0.5,
+            relative_scaling=0.7,  # Increased relative scaling for better size distribution
             colormap=plt.cm.get_cmap('viridis'),
             contour_width=0,
-            margin=2,
+            margin=1,  # Reduced margin to fit more words
             normalize_plurals=True,
             scale=1.0,
             mode='RGBA',
@@ -470,12 +470,12 @@ def create_visualization(
         
         # Calculate size based on number of biological processes
         bp_count = len(bps)
-        # Scale size between 150 and 300 based on bp_count
+        # Scale size between 200 and 400 based on bp_count (larger range)
         if max_count > min_count:
             scale_factor = (bp_count - min_count) / (max_count - min_count)
         else:
             scale_factor = 0.5
-        wc_size = 150 + int(scale_factor * 150)
+        wc_size = 200 + int(scale_factor * 200)
         
         # Calculate word cloud dimensions
         wc_ratio = wc.height / wc.width
@@ -505,24 +505,24 @@ def create_visualization(
         # Add label with grayscale background
         ax.text(
             x, 
-            y - wc_size//2 - 15,  # Position above the word cloud
+            y - wc_size//2 - 8,  # Position closer to the word cloud
             lf_label,
             ha='center', 
             va='top', 
-            fontsize=14,
+            fontsize=12,
             fontweight='normal',
             fontfamily='Arial',
             bbox=dict(
                 facecolor='lightgray', 
                 alpha=0.8, 
                 edgecolor='none', 
-                boxstyle='round,pad=0.5'
+                boxstyle='round,pad=0.3'
             ),
             zorder=4  # Place in front of arrows and word clouds
         )
     
     # Set plot limits and remove axes
-    padding = size * 0.05  # 5% padding
+    padding = size * 0.02  # Reduced padding to 2% to use more space
     ax.set_xlim(0, size)
     ax.set_ylim(0, size)
     ax.set_xticks([])
@@ -531,8 +531,8 @@ def create_visualization(
     
     # Add title with improved font
     plt.title('Biological Processes by Latent Factor', 
-              fontsize=18, 
-              pad=20, 
+              fontsize=16, 
+              pad=10, 
               fontweight='normal',
               fontfamily='Arial')
     
@@ -707,13 +707,13 @@ def main():
                       help='Output file path for the visualization')
     parser.add_argument('--data-dir', type=str, default='visualization_output',
                       help='Directory containing visualization data (fallback if bp_scores not provided)')
-    parser.add_argument('--size', type=int, default=1000,
+    parser.add_argument('--size', type=int, default=1200,
                       help='Size of the output image (width=height)')
     parser.add_argument('--dpi', type=int, default=300,
                       help='DPI of the output image')
-    parser.add_argument('--min-font-size', type=int, default=10,
+    parser.add_argument('--min-font-size', type=int, default=12,
                       help='Minimum font size for word cloud text')
-    parser.add_argument('--max-font-size', type=int, default=120,
+    parser.add_argument('--max-font-size', type=int, default=150,
                       help='Maximum font size for word cloud text')
 
     args = parser.parse_args()
