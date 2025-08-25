@@ -11,6 +11,9 @@ from collections import defaultdict
 # Import generic terms filter
 from generic_terms import GENERIC_BIOMEDICAL_TERMS
 
+# Import term filtering
+from bp_term_filter import filter_bp_terms_for_wordcloud, is_redundant_general_term
+
 # Common biological process n-grams that should be preserved
 BIOLOGICAL_PROCESS_NGRAMS = {
     # Metabolism
@@ -107,11 +110,20 @@ def process_bp_name_for_wordcloud(bp_name: str, preserve_complete_terms: bool = 
             if len(term.split()) > 1 and len(term) > 15:  # Heuristic: multi-word and reasonably long
                 complete_terms.append(term)
     
+    # Apply additional filtering to remove redundant and vague terms
+    filtered_terms = filter_bp_terms_for_wordcloud(filtered_terms)
+    
     # If we want to prioritize complete terms, return only those
     # Otherwise return all terms with complete terms appearing multiple times for emphasis
     if preserve_complete_terms and complete_terms:
         # Return complete terms with higher frequency and all other terms with lower frequency
-        return complete_terms + [term for term in filtered_terms if term not in complete_terms]
+        # But first filter out redundant general terms
+        non_redundant_terms = []
+        for term in filtered_terms:
+            if not is_redundant_general_term(term, complete_terms):
+                non_redundant_terms.append(term)
+        
+        return complete_terms + [term for term in non_redundant_terms if term not in complete_terms]
     else:
         return filtered_terms
 

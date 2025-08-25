@@ -58,5 +58,26 @@ GENERIC_BIOMEDICAL_TERMS = {
     
     # Action verbs often in BP names
     'involved', 'associated', 'related', 'mediated', 'driven',
-    'dependent', 'independent', 'induced', 'repressed'
+    'dependent', 'independent', 'induced', 'repressed',
+    
+    # Category 1: Extremely General Processes
+    # (These are often the highest-level parent terms in gene ontology hierarchies)
+    'biosynthetic', 'catabolic', 'metabolic', 'morphogenesis',
+    'secretion', 'stimulus', 'proliferation', 'inhibition',
+    
+    # Category 2: Vague Actions & Generic Nouns
+    # (These words are meaningless without knowing the object or context)
+    'formation', 'generation', 'transition', 'transmission',
+    'migration', 'contraction', 'junction', 'cycle',
+    
+    # Category 3: Fragmented Chemical & Component Terms
+    # (These are parts of more specific multi-word terms and should not appear alone)
+    'acid', 'actin', 'fatty', 'filament', 'fluid',
+    'hormone', 'ion', 'organic', 'phosphate',
+    'receptor', 'vitamin',
+    
+    # Category 4: Overly Broad Anatomical Terms
+    # (These are usually too high-level unless your entire study is a comparison between them)
+    'blood', 'embryonic', 'epithelial', 'muscle',
+    'nervous', 'skeletal', 'systemic', 'vessel'
 }

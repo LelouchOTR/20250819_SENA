@@ -20,9 +20,10 @@ import networkx as nx
 # Import generic terms filter
 from generic_terms import GENERIC_BIOMEDICAL_TERMS
 
-# Import n-gram processor
+# Import n-gram processor and term filtering
 try:
     from ngram_bp_processor import process_bp_name_for_wordcloud
+    from bp_term_filter import filter_bp_terms_for_wordcloud, get_term_specificity_score
     NGRAM_PROCESSING_AVAILABLE = True
 except ImportError:
     NGRAM_PROCESSING_AVAILABLE = False
@@ -265,6 +266,10 @@ def create_visualization(
                 # Fallback to basic word splitting
                 terms = bp_name.split()
             
+            # Apply additional filtering to remove redundant and vague terms
+            if NGRAM_PROCESSING_AVAILABLE:
+                terms = filter_bp_terms_for_wordcloud(terms)
+            
             # Add each term with the score, emphasizing complete terms
             for i, term in enumerate(terms):
                 # Clean term
@@ -278,9 +283,11 @@ def create_visualization(
                 # Filter out generic biomedical terms
                 if cleaned_term and cleaned_term.lower() not in GENERIC_BIOMEDICAL_TERMS:  # Only add non-empty, non-generic terms
                     # Give higher weight to complete terms (first occurrences)
-                    if NGRAM_PROCESSING_AVAILABLE and i < len(terms) // 2:
-                        # Boost weight for complete terms
-                        frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score * 2.0
+                    if NGRAM_PROCESSING_AVAILABLE:
+                        # Use specificity score to weight terms
+                        specificity_bonus = get_term_specificity_score(cleaned_term)
+                        weighted_score = score * (1.0 + specificity_bonus)
+                        frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + weighted_score
                     else:
                         frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score
         
@@ -409,6 +416,10 @@ def create_visualization(
                 # Fallback to basic word splitting
                 terms = bp_name.split()
             
+            # Apply additional filtering to remove redundant and vague terms
+            if NGRAM_PROCESSING_AVAILABLE:
+                terms = filter_bp_terms_for_wordcloud(terms)
+            
             # Add each term with the score, emphasizing complete terms
             for i, term in enumerate(terms):
                 # Clean term
@@ -422,9 +433,11 @@ def create_visualization(
                 # Filter out generic biomedical terms
                 if cleaned_term and cleaned_term.lower() not in GENERIC_BIOMEDICAL_TERMS:  # Only add non-empty, non-generic terms
                     # Give higher weight to complete terms (first occurrences)
-                    if NGRAM_PROCESSING_AVAILABLE and i < len(terms) // 2:
-                        # Boost weight for complete terms
-                        frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score * 2.0
+                    if NGRAM_PROCESSING_AVAILABLE:
+                        # Use specificity score to weight terms
+                        specificity_bonus = get_term_specificity_score(cleaned_term)
+                        weighted_score = score * (1.0 + specificity_bonus)
+                        frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + weighted_score
                     else:
                         frequencies[cleaned_term] = frequencies.get(cleaned_term, 0) + score
         

@@ -137,9 +137,9 @@ The script accepts several command-line arguments to customize the training proc
 
 Refer to `README_ablation.md` in the `src` folder.
 
-## Biological Process N-gram Processing
+## Biological Process N-gram Processing and Filtering
 
-This project now includes n-gram processing for biological process terms to preserve complete terms like "fatty acid beta-oxidation" instead of splitting them into individual words.
+This project now includes enhanced n-gram processing and comprehensive filtering for biological process terms to preserve complete terms like "fatty acid beta-oxidation" while removing redundant and vague terms that clutter the visualization.
 
 See [BIOLOGICAL_PROCESSES_README.md](BIOLOGICAL_PROCESSES_README.md) for more details on implementation and usage.
 
